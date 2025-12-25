@@ -1,0 +1,6 @@
+<!-- public/index.html -->
+<head>
+  <!-- 기존 메타/타이틀 등 위에 추가 -->
+  <link rel="icon" href="/parents-web/favicon.ico" />
+  <!-- ... -->
+</head>
