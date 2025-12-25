@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "npx vite build",
     "preview": "vite preview",
-"deploy": "npm run build && git add docs -A && (git commit -m \"🚀 자동 배포 (docs)\" || echo no-changes) && git push origin main"
+    "deploy": "npm run build && git add docs -A && (git commit -m \"🚀 자동 배포 (docs)\" || echo no-changes) && git push origin main"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
@@ -31,6 +31,7 @@
     "globals": "^16.0.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
-    "vite": "^6.3.1"
+    "vite": "^6.3.1",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }
