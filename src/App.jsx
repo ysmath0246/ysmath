@@ -9,17 +9,23 @@ import {
   useLocation,
 } from "react-router-dom";
 
-// ✅ 여기 중요!! App.jsx는 src 안에 있으므로 ./firebase 가 맞음
 import { db } from "./firebase";
 import { getDocs, collection } from "firebase/firestore";
 
 import LoginPage from "./pages/LoginPage.jsx";
 import AttendancePage from "./pages/AttendancePage.jsx";
+
+// ✅ (예전/횟수제 결제 내역 페이지) - 기존 PaymentPage.jsx를 "지난 결제 내역"으로 사용
 import PaymentPage from "./pages/PaymentPage.jsx";
+
+// ✅ 공지/내아이/수강신청
 import NoticesPage from "./pages/NoticesPage.jsx";
 import MyClassPage from "./pages/MyClassPage.jsx";
 import EnrollPage from "./pages/EnrollPage.jsx";
-import NewEnrollPage from "./pages/NewEnrollPage.jsx";
+
+
+// ✅ 월제 결제 메인 페이지 (새로 추가)
+import MonthlyPaymentPage from "./pages/MonthlyPaymentPage.jsx";
 
 // ✅ 새로 추가되는 페이지 2개
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
@@ -139,9 +145,6 @@ function AppContent() {
     checkNewItems();
   }, [hasStudentSelected]);
 
-  // ✅✅ 자동 로그아웃 끔 (요청 반영)
-  // (원래 여기 있던 타이머 useEffect 삭제)
-
   const logout = () => {
     localStorage.clear();
     setIsParentLoggedIn(false);
@@ -164,7 +167,13 @@ function AppContent() {
       {isParentLoggedIn && !mustChangePw && (
         <nav className="nav">
           <div className="nav-links" style={{ justifyContent: "center" }}>
-            {["/attendance", "/payment", "/notices", "/myclass", "/enroll"].map((path) => (
+            {[
+              "/attendance",
+              "/payment",     // ✅ 월제 결제가 여기로
+              "/notices",
+              "/myclass",
+              "/enroll",
+            ].map((path) => (
               <NavLink
                 key={path}
                 to={path}
@@ -184,7 +193,7 @@ function AppContent() {
               >
                 {{
                   "/attendance": "출석",
-                  "/payment": "결제",
+                  "/payment": "결제", // ✅ 월제(메인)
                   "/notices": "공지사항",
                   "/myclass": (
                     <>
@@ -215,21 +224,7 @@ function AppContent() {
               </NavLink>
             ))}
 
-            {/* ✅ 다자녀용: 아이 변경 */}
-            <button
-              onClick={() => {
-                window.location.hash = "#/select-child";
-              }}
-              style={{
-                padding: "6px 12px",
-                border: "none",
-                borderRadius: 6,
-                backgroundColor: "#f0f0f0",
-                cursor: "pointer",
-              }}
-            >
-              아이 변경
-            </button>
+            {/* ✅ 아이 변경 버튼 제거 (각 페이지/선택 페이지에서만 하도록) */}
 
             {/* ✅ 부모 비밀번호 변경 */}
             <button
@@ -264,7 +259,7 @@ function AppContent() {
       )}
 
       <Routes>
-        {/* ① index 분기 */}
+        {/* ① index 분기: ✅ 무조건 공지사항이 첫 화면 */}
         <Route
           index
           element={
@@ -301,11 +296,17 @@ function AppContent() {
           }
         />
 
-        <Route path="new-enroll" element={<NewEnrollPage />} />
+        
 
         {/* ③ 주요 페이지 (학생 선택까지 끝난 상태에서만) */}
         <Route path="attendance" element={guard(<AttendancePage />)} />
-        <Route path="payment" element={guard(<PaymentPage />)} />
+
+        {/* ✅ 결제 메인 = 월제 페이지 */}
+        <Route path="payment" element={guard(<MonthlyPaymentPage />)} />
+
+        {/* ✅ 지난 결제 내역(예전 횟수제) 페이지 */}
+        <Route path="payment-history" element={guard(<PaymentPage />)} />
+
         <Route path="notices" element={guard(<NoticesPage />)} />
         <Route path="myclass" element={guard(<MyClassPage />)} />
         <Route path="enroll" element={guard(<EnrollPage />)} />

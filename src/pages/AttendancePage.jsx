@@ -34,6 +34,28 @@ export default function AttendancePage() {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth()); // 0~11
 
+  // ✅ 토요일 포함 토글(기본 OFF) / 일요일은 항상 제외
+  const [includeSat, setIncludeSat] = useState(false);
+
+  // ✅ 모바일 감지 (가로 길어서 보기 불편한 거 해결용)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    // 최신/구형 브라우저 대응
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+
   // ───────────────────────────────────────────────
   // ✅ "아이 변경(select-child)" 했을 때 localStorage 변화를 감지해서 state 갱신
   useEffect(() => {
@@ -42,12 +64,10 @@ export default function AttendancePage() {
       setSelectedStudentName((localStorage.getItem("studentName") || "").trim());
     };
 
-    // 같은 탭에서 localStorage 바뀌면 storage 이벤트가 안 뜨는 경우가 많아서
-    // ✅ hashchange(라우팅)도 같이 감지 + 주기적으로 한 번 더 확인(가벼운 폴링)
     window.addEventListener("storage", syncFromStorage);
     window.addEventListener("hashchange", syncFromStorage);
 
-    const t = setInterval(syncFromStorage, 800); // 너무 잦지 않게
+    const t = setInterval(syncFromStorage, 800);
     return () => {
       window.removeEventListener("storage", syncFromStorage);
       window.removeEventListener("hashchange", syncFromStorage);
@@ -104,7 +124,6 @@ export default function AttendancePage() {
           }
         }
 
-        // 이름 기준 정렬(보기 좋게)
         items.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         setChildren(items);
       } catch (e) {
@@ -194,15 +213,13 @@ export default function AttendancePage() {
   }, [attendanceByDate, children]);
 
   // ───────────────────────────────────────────────
-  // ✅ 여기에서 아이 변경(드롭다운)
+  // ✅ 아이 변경(드롭다운)
   const changeChild = async (newId) => {
     if (!newId) return;
 
-    // 이름 찾기
     const found = children.find((c) => c.id === newId);
     let nm = (found?.name || "").trim();
 
-    // 혹시 children에 이름이 비어있으면 students에서 조회
     if (!nm) {
       try {
         const sSnap = await getDoc(doc(db, "students", newId));
@@ -235,21 +252,35 @@ export default function AttendancePage() {
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [attendanceByDate, selectedStudentName]);
 
+  // ✅ 월별 + (일요일 제외, 토요일은 includeSat일 때만)
   const myLogsThisMonth = useMemo(() => {
     const ym = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
-    return myLogsAll.filter((r) => r.date.startsWith(ym));
-  }, [myLogsAll, viewYear, viewMonth]);
+    return myLogsAll
+      .filter((r) => r.date.startsWith(ym))
+      .filter((r) => {
+        const d = new Date(r.date + "T00:00:00");
+        const dow = d.getDay(); // 0=일, 6=토
+        if (dow === 0) return false; // 일요일은 항상 숨김
+        if (dow === 6) return includeSat; // 토요일은 토글일 때만
+        return true; // 월~금
+      });
+  }, [myLogsAll, viewYear, viewMonth, includeSat]);
 
   // ───────────────────────────────────────────────
-  // 달력(월~금)
+  // 달력(월~금 기본, 토요일 옵션)
+  const weekLabels = includeSat ? ["월", "화", "수", "목", "금", "토"] : ["월", "화", "수", "목", "금"];
+  const colCount = includeSat ? 6 : 5;
+
   const monthMatrix = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
     const days = [];
 
     const firstDow = first.getDay();
     const start = new Date(first);
-    const offsetToMonday = (firstDow + 6) % 7;
+    const offsetToMonday = (firstDow + 6) % 7; // 월요일 기준
     start.setDate(first.getDate() - offsetToMonday);
+
+    const maxDow = includeSat ? 6 : 5; // 월(1)~금(5) / 토(6) 옵션
 
     for (let w = 0; w < 6; w++) {
       const weekRow = [];
@@ -259,8 +290,9 @@ export default function AttendancePage() {
         const day = new Date(cur);
         day.setDate(cur.getDate() + d);
         const dow = day.getDay();
-        if (dow >= 1 && dow <= 5) weekRow.push(new Date(day));
+        if (dow >= 1 && dow <= maxDow) weekRow.push(new Date(day));
       }
+
       if (
         weekRow.some(
           (d) =>
@@ -271,6 +303,7 @@ export default function AttendancePage() {
         days.push(weekRow);
       }
     }
+
     while (
       days.length &&
       days[days.length - 1].every((d) => d.getMonth() !== viewMonth)
@@ -278,7 +311,7 @@ export default function AttendancePage() {
       days.pop();
     }
     return days;
-  }, [viewYear, viewMonth]);
+  }, [viewYear, viewMonth, includeSat]);
 
   const toYMD = (d) => {
     const y = d.getFullYear();
@@ -307,8 +340,75 @@ export default function AttendancePage() {
     boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   };
 
+  // ✅ 모바일용 공통 스타일
+  const pageWrap = {
+    padding: isMobile ? 10 : 16,
+    maxWidth: 980,
+    margin: "0 auto",
+  };
+
+  const headerWrap = {
+    display: "flex",
+    gap: isMobile ? 10 : 10,
+    alignItems: isMobile ? "stretch" : "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    flexDirection: isMobile ? "column" : "row",
+  };
+
+  const rightControls = {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: isMobile ? "stretch" : "flex-end",
+    flexDirection: isMobile ? "column" : "row",
+  };
+
+  const controlRow = {
+    display: "flex",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: isMobile ? "space-between" : "flex-end",
+    flexWrap: "wrap",
+  };
+
+  const selectStyle = {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "white",
+    fontWeight: 800,
+    cursor: "pointer",
+    width: isMobile ? "100%" : "auto",
+  };
+
+  const buttonStyle = (bg = "white") => ({
+    padding: isMobile ? "10px 12px" : "8px 12px",
+    border: "1px solid #d1d5db",
+    borderRadius: 12,
+    background: bg,
+    cursor: "pointer",
+    fontWeight: 900,
+    width: isMobile ? "100%" : "auto",
+  });
+
+  const smallBtn = {
+    padding: "7px 10px",
+    border: "1px solid #d1d5db",
+    borderRadius: 999,
+    background: "white",
+    cursor: "pointer",
+    fontWeight: 900,
+    fontSize: 12,
+    whiteSpace: "nowrap",
+  };
+
+  const calendarGap = isMobile ? 6 : 10;
+  const cellMinH = isMobile ? 64 : 86;
+  const cellPad = isMobile ? 8 : 10;
+
   return (
-    <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
+    <div style={pageWrap}>
       {/* ✅ 실시간 팝업 */}
       {popup && (
         <div
@@ -350,6 +450,7 @@ export default function AttendancePage() {
                   borderRadius: 10,
                   padding: "6px 10px",
                   cursor: "pointer",
+                  fontWeight: 900,
                 }}
               >
                 닫기
@@ -360,62 +461,45 @@ export default function AttendancePage() {
       )}
 
       {/* 상단 헤더 */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
+      <div style={headerWrap}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>📌 출석 확인</div>
-          <div style={{ color: "#6b7280", fontSize: 13, marginTop: 2 }}>
+          <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 900 }}>
+            📌 출석 확인
+          </div>
+          <div style={{ color: "#6b7280", fontSize: 13, marginTop: 4, lineHeight: 1.4 }}>
             {selectedStudentName
               ? `현재 선택: ${selectedStudentName}`
               : "학생 선택이 필요합니다."}
             {children.length > 1 && (
-              <span style={{ marginLeft: 8, color: "#10b981", fontWeight: 700 }}>
-                (다자녀 실시간 감시중)
+              <span style={{ marginLeft: 8, color: "#10b981", fontWeight: 800 }}>
+                (실시간 업데이트 중)
               </span>
             )}
           </div>
         </div>
 
-        {/* ✅ 다자녀면 드롭다운으로 바로 변경 */}
         {children.length > 0 && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: "#6b7280" }}>아이 선택</span>
-            <select
-              value={selectedStudentId}
-              onChange={(e) => changeChild(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 12,
-                border: "1px solid #d1d5db",
-                background: "white",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {children.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div style={rightControls}>
+            <div style={controlRow}>
+              <span style={{ fontSize: 12, color: "#6b7280", minWidth: 44 }}>
+                아이 선택
+              </span>
+              <select
+                value={selectedStudentId}
+                onChange={(e) => changeChild(e.target.value)}
+                style={selectStyle}
+              >
+                {children.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <button
               onClick={() => (window.location.hash = "#/select-child")}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 12,
-                border: "1px solid #d1d5db",
-                background: "#f9fafb",
-                cursor: "pointer",
-                fontWeight: 800,
-              }}
+              style={buttonStyle("#f9fafb")}
             >
               아이 변경
             </button>
@@ -424,72 +508,93 @@ export default function AttendancePage() {
       </div>
 
       {/* 달력 카드 */}
-      <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+      <div style={{ ...card, padding: isMobile ? 12 : 14, marginBottom: 14 }}>
+        {/* 달력 상단 컨트롤: 모바일에서 줄바꿈 + 토요일 토글 */}
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: isMobile ? "stretch" : "center",
             justifyContent: "space-between",
             marginBottom: 10,
+            gap: 8,
+            flexDirection: isMobile ? "column" : "row",
           }}
         >
-          <button
-            onClick={prevMonth}
+          <div
             style={{
-              padding: "8px 12px",
-              border: "1px solid #d1d5db",
-              borderRadius: 12,
-              background: "white",
-              cursor: "pointer",
-              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
             }}
           >
-            ◀
-          </button>
+            <button onClick={prevMonth} style={buttonStyle("white")}>
+              ◀
+            </button>
 
-          <div style={{ fontWeight: 900, fontSize: 16 }}>{monthTitle}</div>
+            <div style={{ fontWeight: 900, fontSize: 16, textAlign: "center", flex: 1 }}>
+              {monthTitle}
+            </div>
 
-          <button
-            onClick={nextMonth}
+            <button onClick={nextMonth} style={buttonStyle("white")}>
+              ▶
+            </button>
+          </div>
+
+          {/* ✅ 토요일 포함 토글 (기본 OFF) */}
+          <div
             style={{
-              padding: "8px 12px",
-              border: "1px solid #d1d5db",
-              borderRadius: 12,
-              background: "white",
-              cursor: "pointer",
-              fontWeight: 800,
+              display: "flex",
+              gap: 8,
+              justifyContent: isMobile ? "stretch" : "flex-end",
+              flexWrap: "wrap",
             }}
           >
-            ▶
-          </button>
+            <button
+              onClick={() => setIncludeSat((v) => !v)}
+              style={{
+                ...smallBtn,
+                background: includeSat ? "#111827" : "white",
+                color: includeSat ? "white" : "#111827",
+                borderColor: includeSat ? "#111827" : "#d1d5db",
+                width: isMobile ? "100%" : "auto",
+              }}
+              title="토요일 보강이 있는 달만 켜주세요"
+            >
+              {includeSat ? "토요일 포함 ON" : "토요일 포함 OFF"}
+            </button>
+          </div>
         </div>
 
+        {/* 요일 헤더 */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 10,
+            gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+            gap: calendarGap,
             paddingBottom: 10,
             borderBottom: "1px solid #f1f5f9",
-            fontWeight: 800,
+            fontWeight: 900,
             color: "#6b7280",
+            fontSize: 13,
           }}
         >
-          {["월", "화", "수", "목", "금"].map((w) => (
+          {weekLabels.map((w) => (
             <div key={w} style={{ textAlign: "center" }}>
               {w}
             </div>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 10 }}>
+        {/* 달력 본문 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: calendarGap, marginTop: 10 }}>
           {monthMatrix.map((week, idx) => (
             <div
               key={idx}
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: 10,
+                gridTemplateColumns: `repeat(${colCount}, 1fr)`,
+                gap: calendarGap,
               }}
             >
               {week.map((d) => {
@@ -508,10 +613,10 @@ export default function AttendancePage() {
                     key={ymd}
                     title={isHoliday ? `${ymd} • ${holidayMap[ymd]}` : ymd}
                     style={{
-                      minHeight: 86,
+                      minHeight: cellMinH,
                       border: `1px solid ${isHoliday ? "#fecaca" : "#e5e7eb"}`,
                       borderRadius: 14,
-                      padding: 10,
+                      padding: cellPad,
                       background: inMonth
                         ? isHoliday
                           ? "#fff1f2"
@@ -520,6 +625,7 @@ export default function AttendancePage() {
                           : "white"
                         : "#fafafa",
                       opacity: inMonth ? 1 : 0.55,
+                      overflow: "hidden",
                     }}
                   >
                     <div
@@ -528,9 +634,16 @@ export default function AttendancePage() {
                         alignItems: "baseline",
                         justifyContent: "space-between",
                         marginBottom: 6,
+                        gap: 6,
                       }}
                     >
-                      <div style={{ fontWeight: 900, fontSize: 14, color: isHoliday ? "#ef4444" : "#111827" }}>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          fontSize: isMobile ? 13 : 14,
+                          color: isHoliday ? "#ef4444" : "#111827",
+                        }}
+                      >
                         {d.getDate()}
                       </div>
 
@@ -543,6 +656,10 @@ export default function AttendancePage() {
                             background: "rgba(239,68,68,0.10)",
                             padding: "2px 8px",
                             borderRadius: 999,
+                            maxWidth: "75%",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
                           {holidayMap[ymd]}
@@ -551,18 +668,20 @@ export default function AttendancePage() {
                     </div>
 
                     {myRecord ? (
-                      <div style={{ fontSize: 12, color: "#111827", lineHeight: 1.5 }}>
-                        <div>
-                          <span style={{ color: "#0284c7", fontWeight: 800 }}>입실</span>{" "}
+                      <div style={{ fontSize: isMobile ? 11 : 12, color: "#111827", lineHeight: 1.45 }}>
+                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <span style={{ color: "#0284c7", fontWeight: 900 }}>입실</span>{" "}
                           {myRecord.time || "-"}
                         </div>
-                        <div>
-                          <span style={{ color: "#16a34a", fontWeight: 800 }}>하원</span>{" "}
+                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <span style={{ color: "#16a34a", fontWeight: 900 }}>하원</span>{" "}
                           {myRecord.departureTime || "-"}
                         </div>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>기록 없음</div>
+                      <div style={{ fontSize: isMobile ? 11 : 12, color: "#9ca3af" }}>
+                        기록 없음
+                      </div>
                     )}
                   </div>
                 );
@@ -572,48 +691,28 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* 표 카드 */}
-      <div style={{ ...card, padding: 14 }}>
+      {/* 기록 카드 */}
+      <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: isMobile ? "stretch" : "center",
             justifyContent: "space-between",
             marginBottom: 10,
+            gap: 10,
+            flexDirection: isMobile ? "column" : "row",
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 900 }}>
+          <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 900 }}>
             📋 내 출석 기록 (입실/하원)
           </div>
 
-          <div>
-            <button
-              onClick={prevMonth}
-              style={{
-                padding: "6px 10px",
-                border: "1px solid #d1d5db",
-                borderRadius: 10,
-                background: "white",
-                cursor: "pointer",
-                marginRight: 6,
-                fontWeight: 800,
-              }}
-            >
+          <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
+            <button onClick={prevMonth} style={smallBtn}>
               ◀
             </button>
             <span style={{ fontWeight: 900 }}>{monthTitle}</span>
-            <button
-              onClick={nextMonth}
-              style={{
-                padding: "6px 10px",
-                border: "1px solid #d1d5db",
-                borderRadius: 10,
-                background: "white",
-                cursor: "pointer",
-                marginLeft: 6,
-                fontWeight: 800,
-              }}
-            >
+            <button onClick={nextMonth} style={smallBtn}>
               ▶
             </button>
           </div>
@@ -621,7 +720,51 @@ export default function AttendancePage() {
 
         {myLogsThisMonth.length === 0 ? (
           <div style={{ color: "#6b7280" }}>해당 월의 출석 기록이 없습니다.</div>
+        ) : isMobile ? (
+          // ✅ 모바일: 카드형 리스트(옆으로 길어지는 표 제거)
+          <div style={{ display: "grid", gap: 10 }}>
+            {myLogsThisMonth
+              .slice()
+              .sort((a, b) => b.date.localeCompare(a.date))
+              .map((row) => (
+                <div
+                  key={row.date}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 14,
+                    padding: 12,
+                    background: "white",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontWeight: 900 }}>
+                      {row.date}
+                      {holidayMap[row.date] && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: "#ef4444", fontWeight: 900 }}>
+                          {holidayMap[row.date]}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
+                      {row.status || "-"}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#0284c7", fontWeight: 900 }}>입실</span>
+                      <span style={{ fontWeight: 900 }}>{row.time || "-"}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ color: "#16a34a", fontWeight: 900 }}>하원</span>
+                      <span style={{ fontWeight: 900 }}>{row.departureTime || "-"}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
         ) : (
+          // ✅ PC: 표 유지
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
@@ -639,7 +782,7 @@ export default function AttendancePage() {
                   .map((row) => (
                     <tr key={row.date}>
                       <td style={td}>
-                        <span style={{ fontWeight: 800 }}>{row.date}</span>
+                        <span style={{ fontWeight: 900 }}>{row.date}</span>
                         {holidayMap[row.date] && (
                           <span style={{ marginLeft: 8, fontSize: 12, color: "#ef4444", fontWeight: 900 }}>
                             ({holidayMap[row.date]})

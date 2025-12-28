@@ -1,5 +1,5 @@
 // src/pages/MyClassPage.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -22,8 +22,26 @@ export default function MyClassPage() {
   // ✅ 부모의 자녀 목록
   const [children, setChildren] = useState([]); // [{id,name}]
 
+  // ✅ 모바일 감지
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+
   // ───────────────────────────────────────────────
-  // ✅ localStorage 변화 감지 (아이 변경 페이지 없어도 반영되게)
+  // ✅ localStorage 변화 감지 (아이 변경 반영)
   useEffect(() => {
     const syncFromStorage = () => {
       setSelectedStudentId(localStorage.getItem("studentId") || "");
@@ -86,7 +104,6 @@ export default function MyClassPage() {
     const found = children.find((c) => c.id === newId);
     let nm = (found?.name || "").trim();
 
-    // 혹시 이름이 비어있으면 students에서 조회
     if (!nm) {
       try {
         const sSnap = await getDoc(doc(db, "students", newId));
@@ -99,16 +116,18 @@ export default function MyClassPage() {
 
     setSelectedStudentId(newId);
     setSelectedStudentName(nm);
-
-    // ✅ 탭 안의 하위 컴포넌트들이 localStorage를 기준으로 다시 읽게 유도
-    // (필요하면 CommentPage/BooksPage 쪽에서 studentId를 useEffect deps로 읽도록 추가하면 더 완벽)
   };
 
-  const shell = {
-    maxWidth: 980,
-    margin: "0 auto",
-    padding: 16,
-  };
+  // ───────────────────────────────────────────────
+  // styles
+  const shell = useMemo(
+    () => ({
+      maxWidth: 980,
+      margin: "0 auto",
+      padding: isMobile ? 10 : 16,
+    }),
+    [isMobile]
+  );
 
   const card = {
     border: "1px solid #e5e7eb",
@@ -118,7 +137,7 @@ export default function MyClassPage() {
   };
 
   const tabBtn = (active) => ({
-    padding: "10px 14px",
+    padding: isMobile ? "10px 12px" : "10px 14px",
     borderRadius: 12,
     border: "1px solid " + (active ? "#2563eb" : "#e5e7eb"),
     background: active ? "#2563eb" : "#f9fafb",
@@ -126,23 +145,57 @@ export default function MyClassPage() {
     cursor: "pointer",
     fontWeight: 900,
     fontSize: 14,
+    // ✅ 모바일에서 2개 버튼이 반반으로 딱 떨어지게
+    width: isMobile ? "calc(50% - 4px)" : "auto",
   });
+
+  const label = {
+    fontSize: 12,
+    color: "#6b7280",
+    fontWeight: 800,
+    whiteSpace: "nowrap",
+  };
+
+  const selectStyle = {
+    padding: isMobile ? "12px 12px" : "10px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    width: isMobile ? "100%" : 220,
+    minWidth: isMobile ? "auto" : 180,
+  };
+
+  const actionBtn = {
+    padding: isMobile ? "12px 12px" : "10px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "#f3f4f6",
+    cursor: "pointer",
+    fontWeight: 900,
+    width: isMobile ? "100%" : "auto",
+  };
 
   return (
     <div style={shell}>
       {/* 헤더 + 아이 선택 */}
-      <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+      <div style={{ ...card, padding: isMobile ? 12 : 14, marginBottom: 12 }}>
         <div
           style={{
             display: "flex",
             gap: 10,
-            alignItems: "center",
+            alignItems: isMobile ? "stretch" : "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
+            flexDirection: isMobile ? "column" : "row",
           }}
         >
+          {/* 왼쪽 타이틀 */}
           <div>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>📚 내 아이 수업 현황</div>
+            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900 }}>
+              📚 내 아이 수업 현황
+            </div>
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
               {selectedStudentName
                 ? `현재 선택: ${selectedStudentName}`
@@ -150,21 +203,25 @@ export default function MyClassPage() {
             </div>
           </div>
 
+          {/* 오른쪽(모바일에서는 아래로 스택) */}
           {children.length > 0 && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>아이 선택</span>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: isMobile ? "stretch" : "center",
+                flexDirection: isMobile ? "column" : "row",
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={label}>아이 선택</span>
+              </div>
+
               <select
                 value={selectedStudentId}
                 onChange={(e) => changeChild(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid #d1d5db",
-                  background: "white",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  minWidth: 180,
-                }}
+                style={selectStyle}
               >
                 {children.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -173,17 +230,9 @@ export default function MyClassPage() {
                 ))}
               </select>
 
-              {/* 필요하면 아이 변경 페이지로도 이동 가능 */}
               <button
                 onClick={() => (window.location.hash = "#/select-child")}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid #d1d5db",
-                  background: "#f3f4f6",
-                  cursor: "pointer",
-                  fontWeight: 900,
-                }}
+                style={actionBtn}
               >
                 아이 변경
               </button>
@@ -191,9 +240,20 @@ export default function MyClassPage() {
           )}
         </div>
 
-        {/* 탭 버튼 */}
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button onClick={() => setTab("comments")} style={tabBtn(tab === "comments")}>
+        {/* 탭 버튼 (모바일: 2열 딱 정리) */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginTop: 12,
+            flexWrap: "wrap",
+            width: "100%",
+          }}
+        >
+          <button
+            onClick={() => setTab("comments")}
+            style={tabBtn(tab === "comments")}
+          >
             📝 코멘트
           </button>
           <button onClick={() => setTab("books")} style={tabBtn(tab === "books")}>
@@ -203,7 +263,7 @@ export default function MyClassPage() {
       </div>
 
       {/* 컨텐츠 */}
-      <div style={{ ...card, padding: 14 }}>
+      <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
         {tab === "comments" && <CommentPage key={`comments_${selectedStudentId}`} />}
         {tab === "books" && <BooksPage key={`books_${selectedStudentId}`} />}
       </div>

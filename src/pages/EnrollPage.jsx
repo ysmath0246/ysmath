@@ -15,36 +15,56 @@ import {
 
 export default function EnrollPage() {
   // 탭:
-  // "intensive" | "elementary" | "middle" | "middleClinic" | "high" | "operation"
+  // "intensive" | "elementary" | "middle" | "middleClinic" | "high" | "advanced"
   const [group, setGroup] = useState("intensive");
+
+  // ✅ 모바일 감지
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
 
   // ✅ 부모/아이
   const parentPhone = localStorage.getItem("parentPhone") || "";
   const [children, setChildren] = useState([]); // [{id,name}]
   const [studentId, setStudentId] = useState(localStorage.getItem("studentId") || "");
-  const [studentName, setStudentName] = useState((localStorage.getItem("studentName") || "").trim());
+  const [studentName, setStudentName] = useState(
+    (localStorage.getItem("studentName") || "").trim()
+  );
 
   // 표에서 클릭한 현재 커서 슬롯
   const [cursor, setCursor] = useState(null); // { day, time } | null
 
-  // 선택 상태 (아래 "신청 선택" 칩)
+  // 선택 상태 (초/중등 신청 선택)
   const [selectedApplied, setSelectedApplied] = useState([]); // [{day,time,status?}]
 
-  // 인원수 집계 (enrollments 컬렉션 기준) - 기존 초/중등만 사용
+  // 인원수 집계 (초/중등 enrollments 컬렉션 기준)
   const [countsApplied, setCountsApplied] = useState({}); // key: `${day}|${time}`
   const [countsReserve, setCountsReserve] = useState({}); // reserve
 
-  // 저장된 문서 실시간 표시용 (enrollments_by_student/{학생이름}) - 기존 초/중등만
+  // 저장된 문서 실시간 표시용 (enrollments_by_student/{학생이름}) - 초/중등만
   const [savedApplied, setSavedApplied] = useState([]); // [{day,time,group,status,label}]
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // ✅ 수강신청 전체 설정 (열림 / 예비만 / 완전마감) - 기존 초/중등만
+  // ✅ 수강신청 전체 설정 (초/중등만) - settings/enrollments
   const [enrollConfig, setEnrollConfig] = useState({
     isOpen: true,
     reserveOnly: false,
   });
 
-  // ✅ 중등부 클리닉 (정기만) - 기존 그대로
+  // ✅ 중등부 클리닉 (정기만)
   const weekdays = ["월", "화", "수", "목", "금"];
   const CLINIC_BLOCKS = [
     { id: "A", label: "A반 (5시 ~ 7시)", timeRange: "5시 ~ 7시" },
@@ -56,7 +76,7 @@ export default function EnrollPage() {
   const [clinicCountsRegular, setClinicCountsRegular] = useState({}); // key: `${day}|${blockId}`
   const [savedClinic, setSavedClinic] = useState(null); // {regular, ...}
 
-  // ✅ 집중연산반(화수목) 3/4/5시 (정원 8) - 기존 그대로
+  // ✅ 집중연산반(화수목) 3/4/5시 (정원 8)
   const OP_DAY = "화수목";
   const OP_TIMES = ["3시", "4시", "5시"];
   const OP_LIMIT = 8;
@@ -65,7 +85,7 @@ export default function EnrollPage() {
   const [savedOperation, setSavedOperation] = useState(null);
   const [opCounts, setOpCounts] = useState({}); // key: time -> count
 
-  // ✅ NEW: 집중학습반(26년1월) - 화/수/목 x 3/4/5시 = 9칸, 2개 또는 3개 선택, 같은 요일 중복 선택 불가, 정원 8
+  // ✅ 집중학습반(26년1월) - 화/수/목 x 3/4/5시 = 9칸, 2개 또는 3개 선택, 같은 요일 중복 선택 불가, 정원 8
   const INT_DAYS = ["화", "수", "목"];
   const INT_TIMES = ["3시", "4시", "5시"];
   const INT_LIMIT = 8;
@@ -75,7 +95,7 @@ export default function EnrollPage() {
   const [intensiveCounts, setIntensiveCounts] = useState({}); // key: `${day}|${time}` -> count
   const [intensiveUpdatedAt, setIntensiveUpdatedAt] = useState(null);
 
-  // ✅ NEW: 고등부(26년3월) - 월/화/목/금 요일만 선택(최대 4개), 정원 6(요일별), 신청/취소 저장
+  // ✅ 고등부(26년3월) - 요일만 선택(최대 4개), 정원 6(요일별)
   const HIGH_DAYS = ["월", "화", "목", "금"];
   const HIGH_LIMIT = 6;
 
@@ -84,13 +104,13 @@ export default function EnrollPage() {
   const [highCounts, setHighCounts] = useState({}); // key: day -> count
   const [highUpdatedAt, setHighUpdatedAt] = useState(null);
 
-  // ✅ NEW: 심화경시반(26년3월) - 신청/신청취소 버튼만 저장
+  // ✅ 심화경시반(26년3월) - 신청/신청취소만
   const [advApplied, setAdvApplied] = useState(false);
   const [savedAdvApplied, setSavedAdvApplied] = useState(false);
   const [advCounts, setAdvCounts] = useState(0);
   const [advUpdatedAt, setAdvUpdatedAt] = useState(null);
 
-  // 시간표 (기존 초/중등 그대로)
+  // 시간표 (초/중등)
   const schedules = useMemo(
     () => ({
       elementary: {
@@ -111,57 +131,71 @@ export default function EnrollPage() {
     []
   );
 
-  // ✅ 상단 헤드라인 표시
-  const headline =
-    "집중학습반(26년1월) / 초등부(26년3월) / 중등부(26년3월) / 중등클리닉(26년3월) / 고등부(26년3월) / 심화경시반(26년3월)";
-
   const labelByGroup = {
-  intensive: "집중학습반(26년1월)",
-  elementary: "초등부(26년3월)",
-  middle: "중등부(26년3월)",
-  middleClinic: "중등부 클리닉(26년3월)",
-  high: "고등부(26년3월)",
-  advanced: "심화경시반(26년3월)",
-};
+    intensive: "집중학습반(26년1월)",
+    elementary: "초등부(26년3월)",
+    middle: "중등부(26년3월)",
+    middleClinic: "중등부 클리닉(26년3월)",
+    high: "고등부(26년3월)",
+    advanced: "심화경시반(26년3월)",
+  };
 
-
-  const currentTable = group === "elementary" || group === "middle" ? schedules[group] : null;
+  const currentTable =
+    group === "elementary" || group === "middle" ? schedules[group] : null;
 
   // ===== helpers =====
   const keyOf = (d, t) => `${d}|${t}`;
   const existsIn = (arr, d, t) => arr.some((s) => s.day === d && s.time === t);
   const clinicKey = (day, blockId) => `${day}|${blockId}`;
 
-  // ✅ “부담 없는 문구” (초/중등: 정원 6 기준) - 기존 그대로
+  // ✅ 정원 6 문구 (초/중등)
   const appliedLabel6 = (appliedCnt) => {
-    if (appliedCnt >= 6) return { text: "마감되었습니다", tone: "danger" };
-    if (appliedCnt >= 4) return { text: "마감임박!", tone: "warn" };
-    return { text: "접수중입니다", tone: "ok" }; // 0~3
+    if (appliedCnt >= 6) return { text: "마감", tone: "danger" };
+    if (appliedCnt >= 4) return { text: "임박", tone: "warn" };
+    return { text: "접수중", tone: "ok" };
   };
 
-  // ✅ 집중연산반(정원 8) 문구 (요청: 1~3 접수중 / 4~7 마감임박 / 8 마감)
+  // ✅ 정원 8 문구 (집중학습/집중연산)
   const appliedLabel8 = (cnt) => {
-    if (cnt >= 8) return { text: "마감되었습니다", tone: "danger" };
-    if (cnt >= 4) return { text: "마감임박!", tone: "warn" }; // 4~7
-    return { text: "접수중입니다", tone: "ok" }; // 0~3
+    if (cnt >= 8) return { text: "마감", tone: "danger" };
+    if (cnt >= 4) return { text: "임박", tone: "warn" };
+    return { text: "접수중", tone: "ok" };
   };
 
-  // ✅ 고등부(정원 6) 문구 (요청: 1~3 접수중 / 4~5 마감임박 / 6 마감)
+  // ✅ 고등부 정원 6 문구
   const appliedLabel6High = (cnt) => {
-    if (cnt >= 6) return { text: "마감되었습니다", tone: "danger" };
-    if (cnt >= 4) return { text: "마감임박!", tone: "warn" }; // 4~5
-    return { text: "접수중입니다", tone: "ok" }; // 0~3
+    if (cnt >= 6) return { text: "마감", tone: "danger" };
+    if (cnt >= 4) return { text: "임박", tone: "warn" };
+    return { text: "접수중", tone: "ok" };
   };
 
   const toneStyle = (tone) => {
     if (tone === "danger")
-      return { background: "#fee2e2", color: "#b91c1c", border: "1px solid #fecaca" };
+      return {
+        background: "#fee2e2",
+        color: "#b91c1c",
+        border: "1px solid #fecaca",
+      };
     if (tone === "warn")
-      return { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" };
-    return { background: "#dcfce7", color: "#166534", border: "1px solid #bbf7d0" };
+      return {
+        background: "#fef3c7",
+        color: "#92400e",
+        border: "1px solid #fde68a",
+      };
+    return {
+      background: "#dcfce7",
+      color: "#166534",
+      border: "1px solid #bbf7d0",
+    };
   };
 
   // ===== UI 스타일 =====
+  const shell = {
+    padding: isMobile ? 10 : 16,
+    maxWidth: 980,
+    margin: "0 auto",
+  };
+
   const card = {
     border: "1px solid #e5e7eb",
     borderRadius: 14,
@@ -169,15 +203,59 @@ export default function EnrollPage() {
     boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   };
 
+  // ✅ 버튼(시간칩) - 모바일에서는 minWidth 제거 + 더 컴팩트
   const btnChip = (active, disabled = false) => ({
-    padding: "10px 12px",
+    padding: isMobile ? "10px 10px" : "10px 12px",
     borderRadius: 14,
     border: `1px solid ${active ? "#2563eb" : "#d1d5db"}`,
     background: active ? "#e7f1ff" : "#fff",
     fontWeight: 900,
     cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.6 : 1,
+    opacity: disabled ? 0.55 : 1,
     textAlign: "left",
+    width: isMobile ? "100%" : "auto",
+  });
+
+  // ✅ 상단 select
+  const selectStyle = {
+    padding: isMobile ? "12px 12px" : "10px 12px",
+    borderRadius: 12,
+    border: "1px solid #d1d5db",
+    background: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    width: isMobile ? "100%" : "auto",
+    minWidth: isMobile ? "auto" : 180,
+  };
+
+  // ✅ 탭 버튼: 모바일은 "한 줄 가로 스크롤"
+  const tabBar = {
+    display: "flex",
+    gap: 8,
+    marginBottom: 12,
+    overflowX: isMobile ? "auto" : "visible",
+    WebkitOverflowScrolling: "touch",
+    paddingBottom: isMobile ? 4 : 0,
+  };
+
+  const tabBtn = (active) => ({
+    padding: isMobile ? "9px 12px" : "10px 14px",
+    borderRadius: 12,
+    border: `1px solid ${active ? "#2563eb" : "#e5e7eb"}`,
+    background: active ? "#2563eb" : "#fff",
+    color: active ? "#fff" : "#111827",
+    fontWeight: 900,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flex: "0 0 auto",
+  });
+
+  const tinyBadge = (label, tone) => ({
+    fontSize: 11,
+    padding: "4px 8px",
+    borderRadius: 999,
+    fontWeight: 900,
+    ...toneStyle(tone),
   });
 
   // ====== 아이 목록 불러오기 ======
@@ -195,7 +273,9 @@ export default function EnrollPage() {
         for (const cid of ids) {
           try {
             const sSnap = await getDoc(doc(db, "students", cid));
-            const nm = sSnap.exists() ? (sSnap.data()?.name || "").toString().trim() : "";
+            const nm = sSnap.exists()
+              ? (sSnap.data()?.name || "").toString().trim()
+              : "";
             items.push({ id: cid, name: nm || "이름없음" });
           } catch {
             items.push({ id: cid, name: "이름없음" });
@@ -219,7 +299,7 @@ export default function EnrollPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentPhone]);
 
-  // ✅ 아이 변경 (요청 1: 안바뀌는 문제 해결 = 상태 싹 초기화)
+  // ✅ 아이 변경 (상태 싹 초기화)
   const changeChild = async (newId) => {
     if (!newId) return;
     const found = children.find((c) => c.id === newId);
@@ -238,7 +318,6 @@ export default function EnrollPage() {
     setStudentId(newId);
     setStudentName(nm);
 
-    // ✅ 화면에 남아있는 "이전 아이" 값 즉시 제거
     setCursor(null);
     setSelectedApplied([]);
     setSavedApplied([]);
@@ -272,9 +351,12 @@ export default function EnrollPage() {
         if (!snap.exists()) return;
         const data = snap.data() || {};
         setEnrollConfig({
-          isOpen: data.isOpen !== undefined && data.isOpen !== null ? !!data.isOpen : true,
+          isOpen:
+            data.isOpen !== undefined && data.isOpen !== null ? !!data.isOpen : true,
           reserveOnly:
-            data.reserveOnly !== undefined && data.reserveOnly !== null ? !!data.reserveOnly : false,
+            data.reserveOnly !== undefined && data.reserveOnly !== null
+              ? !!data.reserveOnly
+              : false,
         });
       },
       (err) => console.error("수강신청 설정 구독 오류:", err)
@@ -323,7 +405,9 @@ export default function EnrollPage() {
         const appliedList = Array.isArray(data.applied) ? data.applied : [];
         setSavedApplied(appliedList);
         setLastUpdated(data.updatedAt?.toDate?.() || null);
-        setSelectedApplied(appliedList.map(({ day, time, status }) => ({ day, time, status })));
+        setSelectedApplied(
+          appliedList.map(({ day, time, status }) => ({ day, time, status }))
+        );
       } else {
         setSavedApplied([]);
         setSelectedApplied([]);
@@ -333,7 +417,7 @@ export default function EnrollPage() {
     return () => unsub();
   }, [studentName]);
 
-  // ====== 중등부 클리닉: middle_clinic_days/{studentId} 구독 (정기만) ======
+  // ====== 중등부 클리닉: middle_clinic_days/{studentId} 구독 ======
   useEffect(() => {
     if (!studentId) {
       setSavedClinic(null);
@@ -355,7 +439,7 @@ export default function EnrollPage() {
     return () => unsub();
   }, [studentId]);
 
-  // ====== 중등부 클리닉 전체 인원 집계 (정기만) ======
+  // ====== 중등부 클리닉 전체 인원 집계 ======
   useEffect(() => {
     const qAll = collection(db, "middle_clinic_days");
     const unsub = onSnapshot(qAll, (snap) => {
@@ -410,7 +494,7 @@ export default function EnrollPage() {
     return () => unsub();
   }, [studentId]);
 
-  // ====== ✅ 집중연산반: 전체 인원 집계 (operation_enrollments) ======
+  // ====== ✅ 집중연산반: 전체 인원 집계 ======
   useEffect(() => {
     const ref = collection(db, "operation_enrollments");
     const unsub = onSnapshot(ref, (snap) => {
@@ -427,7 +511,7 @@ export default function EnrollPage() {
   }, []);
 
   // =========================
-  // ✅ NEW: 집중학습반 구독/집계
+  // ✅ 집중학습반 구독/집계
   // =========================
   useEffect(() => {
     if (!studentId) {
@@ -470,7 +554,7 @@ export default function EnrollPage() {
   }, []);
 
   const toggleIntensiveSlot = (day, time) => {
-    // 같은 요일 중복 선택 불가 → 해당 요일 이미 선택돼 있으면 "교체"로 동작
+    // 같은 요일 중복 선택 불가 → 해당 요일 이미 선택돼 있으면 "교체"
     const already = existsIn(intensiveSelected, day, time);
     if (already) {
       setIntensiveSelected(intensiveSelected.filter((s) => !(s.day === day && s.time === time)));
@@ -509,7 +593,6 @@ export default function EnrollPage() {
       const k = keyOf(day, time);
       const current = intensiveCounts[k] || 0;
 
-      // 내가 이미 그 슬롯을 저장한 상태면 1명 제외해서 체크
       const alreadyMine = savedIntensive.some((s) => s.day === day && s.time === time);
       const adjusted = alreadyMine ? current - 1 : current;
 
@@ -534,7 +617,7 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    // 2) 카운트용: 기존 내 기록 삭제 후 재기록(선택 개수만큼)
+    // 2) 카운트용: 기존 내 기록 삭제 후 재기록
     const qMe = query(collection(db, "intensive_enrollments"), where("studentId", "==", studentId));
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
@@ -556,7 +639,7 @@ export default function EnrollPage() {
   };
 
   // =========================
-  // ✅ NEW: 고등부 구독/집계
+  // ✅ 고등부 구독/집계
   // =========================
   useEffect(() => {
     if (!studentId) {
@@ -616,7 +699,6 @@ export default function EnrollPage() {
       return;
     }
 
-    // 정원 체크(요일별 6명)
     for (const day of highSelectedDays) {
       const current = highCounts[day] || 0;
       const alreadyMine = savedHighDays.includes(day);
@@ -630,7 +712,6 @@ export default function EnrollPage() {
 
     const batch = writeBatch(db);
 
-    // 1) 학생별 저장
     const refByStudent = doc(db, "high_by_student", studentId);
     batch.set(
       refByStudent,
@@ -643,7 +724,6 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    // 2) 카운트용: 기존 내 기록 삭제 후 재기록
     const qMe = query(collection(db, "high_enrollments"), where("studentId", "==", studentId));
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
@@ -664,7 +744,7 @@ export default function EnrollPage() {
   };
 
   // =========================
-  // ✅ NEW: 심화경시반 구독/집계
+  // ✅ 심화경시반 구독/집계
   // =========================
   useEffect(() => {
     if (!studentId) {
@@ -707,7 +787,6 @@ export default function EnrollPage() {
 
     const batch = writeBatch(db);
 
-    // 1) 학생별 저장
     const refByStudent = doc(db, "advanced_by_student", studentId);
     batch.set(
       refByStudent,
@@ -720,7 +799,6 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    // 2) 카운트용 (신청이면 생성 / 취소면 삭제)
     const id = `${studentId}`;
     const refEnroll = doc(db, "advanced_enrollments", id);
 
@@ -738,7 +816,7 @@ export default function EnrollPage() {
     alert(nextApplied ? "심화경시반 신청이 저장되었습니다." : "심화경시반 신청이 취소되었습니다.");
   };
 
-  // ====== 초등부/중등부 선택 로직 (기존 그대로) ======
+  // ====== 초등부/중등부 선택 로직 ======
   const toggleElementarySlot = (day, time) => {
     const validPairs = [
       ["월", "수"],
@@ -805,7 +883,7 @@ export default function EnrollPage() {
   const removeApplied = (day, time) =>
     setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
 
-  // ====== 중등부 클리닉 선택/저장 (기존 그대로) ======
+  // ====== 중등부 클리닉 선택/저장 ======
   const handleSelectRegularDay = (day) => {
     setClinicRegular((prev) => ({
       day,
@@ -860,7 +938,7 @@ export default function EnrollPage() {
     alert("클리닉 신청이 저장되었습니다.");
   };
 
-  // ====== ✅ 집중연산반 저장 (기존 그대로) ======
+  // ====== ✅ 집중연산반 저장 ======
   const saveOperation = async () => {
     if (!studentId || !studentName.trim()) {
       alert("학생 정보 로딩 중입니다. 잠시 후 다시 시도해 주세요.");
@@ -873,7 +951,6 @@ export default function EnrollPage() {
 
     const currentCount = opCounts[operationChoice] || 0;
 
-    // 본인이 이미 그 시간에 저장돼있으면, 자기 1명 제외해서 체크
     let adjustedCount = currentCount;
     if (savedOperation?.time === operationChoice) adjustedCount = currentCount - 1;
 
@@ -884,7 +961,6 @@ export default function EnrollPage() {
 
     const batch = writeBatch(db);
 
-    // 1) 학생별 저장
     const refByStudent = doc(db, "operation_by_student", studentId);
     batch.set(
       refByStudent,
@@ -898,7 +974,6 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    // 2) 카운트용: 기존 내 기록 삭제 후 재기록(1개만 유지)
     const qMe = query(collection(db, "operation_enrollments"), where("studentId", "==", studentId));
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
@@ -917,7 +992,7 @@ export default function EnrollPage() {
     alert("집중연산반 신청이 저장되었습니다.");
   };
 
-  // ====== 수강신청 저장 (초/중등 기존 그대로) ======
+  // ====== 수강신청 저장 (초/중등) ======
   const saveSelections = async () => {
     if (group !== "elementary" && group !== "middle") return;
 
@@ -1021,7 +1096,6 @@ export default function EnrollPage() {
 
     const batch = writeBatch(db);
 
-    // 1) 학생별 요약(enrollments_by_student/{학생이름})
     const refStudent = doc(db, "enrollments_by_student", studentName.trim());
     batch.set(refStudent, {
       studentName: studentName.trim(),
@@ -1036,12 +1110,10 @@ export default function EnrollPage() {
       updatedAt: serverTimestamp(),
     });
 
-    // 2) 기존 enrollments 삭제
     const qMe = query(collection(db, "enrollments"), where("studentName", "==", studentName.trim()));
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
 
-    // 3) 새 enrollments 기록
     appliedForSave.forEach(({ day, time, status }) => {
       const safeStatus = status === "reserve" ? "reserve" : "applied";
       const id = `${studentName.trim()}|${group}|${day}|${time}|${safeStatus}`;
@@ -1061,17 +1133,15 @@ export default function EnrollPage() {
     alert("저장되었습니다.");
   };
 
-  // ✅ 상단 “확정” 문구: 요청 2 반영 (무조건 '확정'이 아니라 신청/예비)
+  // ✅ 상단 “저장 요약”
   const confirmedLines = (() => {
     const lines = [];
 
-    // 집중학습반
     if (savedIntensive?.length) {
       const txt = savedIntensive.map((s) => `${s.day} ${s.time}`).join(", ");
       lines.push(`🟦 집중학습반: ${txt} (신청)`);
     }
 
-    // 초/중등 (기존 enrollments_by_student 기반)
     const elem = savedApplied.filter((x) => x.group === "elementary");
     const mid = savedApplied.filter((x) => x.group === "middle");
 
@@ -1089,48 +1159,72 @@ export default function EnrollPage() {
       lines.push(`🟨 중등부: ${txt}`);
     }
 
-    // 중등클리닉
     if (savedClinic?.regular?.day && savedClinic?.regular?.blockId) {
-      const blockTxt = savedClinic.regular.blockId === "A" ? "A(5시~7시)" : "B(7시~9시)";
+      const blockTxt = savedClinic.regular.blockId === "A" ? "A(5~7)" : "B(7~9)";
       lines.push(`🟧 중등클리닉: ${savedClinic.regular.day} ${blockTxt} (신청)`);
     }
 
-    // 고등부
     if (savedHighDays?.length) {
       lines.push(`🟥 고등부: ${savedHighDays.join(", ")} (신청)`);
     }
 
-    // 심화경시반
     if (savedAdvApplied) {
       lines.push(`🟪 심화경시반: 신청 완료`);
     }
-
 
     if (!lines.length) lines.push("✅ 아직 저장된 신청이 없습니다.");
     return lines;
   })();
 
-  // 탭 순서 (요청 3,5 반영: 집중학습반 맨앞, 중등클리닉 뒤에 고등부)
-const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "advanced"];
+  const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "advanced"];
+
+  // =========================
+  // ✅ 모바일용 렌더링 유틸
+  // =========================
+  const MobileDayCard = ({ day, children }) => (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: 14,
+        padding: 12,
+        background: "#fff",
+      }}
+    >
+      <div style={{ fontWeight: 900, marginBottom: 10, fontSize: 14 }}>{day}</div>
+      {children}
+    </div>
+  );
+
+  const MobileGrid = ({ children }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+      {children}
+    </div>
+  );
 
   return (
-    <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
-      {/* ✅ 상단: 아이 선택 + 헤드라인 + 저장상태 */}
-      <div style={{ ...card, padding: 14, marginBottom: 12 }}>
-       
-
+    <div style={shell}>
+      {/* ✅ 상단 카드 */}
+      <div style={{ ...card, padding: isMobile ? 12 : 14, marginBottom: 12 }}>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: isMobile ? "stretch" : "center",
             gap: 10,
             flexWrap: "wrap",
+            flexDirection: isMobile ? "column" : "row",
           }}
         >
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>수강신청</div>
-            <div style={{ marginTop: 6, fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 900 }}>수강신청</div>
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 13,
+                color: "#374151",
+                lineHeight: 1.65,
+              }}
+            >
               {confirmedLines.map((t, idx) => (
                 <div key={idx} style={{ whiteSpace: "pre-wrap" }}>
                   {t}
@@ -1140,20 +1234,14 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
           </div>
 
           {children.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>아이 선택</span>
+            <div style={{ width: isMobile ? "100%" : "auto" }}>
+              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900, marginBottom: 6 }}>
+                아이 선택
+              </div>
               <select
                 value={studentId}
                 onChange={(e) => changeChild(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 12,
-                  border: "1px solid #d1d5db",
-                  background: "white",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                  minWidth: 180,
-                }}
+                style={selectStyle}
               >
                 {children.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -1165,7 +1253,7 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
           )}
         </div>
 
-        {/* 상태 뱃지 (초/중등 신청창만 관련: 기존 그대로) */}
+        {/* 상태 뱃지 (초/중등만) */}
         <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
           <span
             style={{
@@ -1183,16 +1271,20 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                   ? "#92400e"
                   : "#166534"
                 : "#b91c1c",
-              fontWeight: 800,
+              fontWeight: 900,
             }}
           >
-            {enrollConfig.isOpen ? (enrollConfig.reserveOnly ? "예비만 접수(초/중등)" : "접수중(초/중등)") : "완전 마감(초/중등)"}
+            {enrollConfig.isOpen
+              ? enrollConfig.reserveOnly
+                ? "예비만 접수(초/중등)"
+                : "접수중(초/중등)"
+              : "완전 마감(초/중등)"}
           </span>
         </div>
       </div>
 
-      {/* 탭 */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      {/* ✅ 탭 */}
+      <div style={tabBar}>
         {tabs.map((g) => {
           const active = group === g;
           return (
@@ -1202,15 +1294,7 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                 setGroup(g);
                 setCursor(null);
               }}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 12,
-                border: `1px solid ${active ? "#2563eb" : "#e5e7eb"}`,
-                background: active ? "#2563eb" : "#fff",
-                color: active ? "#fff" : "#111827",
-                fontWeight: 900,
-                cursor: "pointer",
-              }}
+              style={tabBtn(active)}
             >
               {labelByGroup[g]}
             </button>
@@ -1219,112 +1303,144 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
       </div>
 
       {/* =========================
-          ✅ 집중학습반 (요청 4)
-          ========================= */}
+          ✅ 집중학습반
+      ========================= */}
       {group === "intensive" ? (
-        <div style={{ ...card, padding: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>집중학습반(26년1월)</div>
+              <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
+                집중학습반(26년1월)
+              </div>
               <div style={{ fontSize: 12, color: "#6b7280" }}>
-                ✅ 9개 중 <b>2개 또는 3개</b> 선택 / 같은 요일 중복 선택 불가 / 정원: 각 시간 <b>{INT_LIMIT}명</b>
+                ✅ 9개 중 <b>2개 또는 3개</b> 선택 / 같은 요일 중복 불가 / 정원: 각 시간{" "}
+                <b>{INT_LIMIT}명</b>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
-              {intensiveUpdatedAt ? `업데이트: ${intensiveUpdatedAt.toLocaleString()}` : ""}
+            {!isMobile && (
+              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
+                {intensiveUpdatedAt ? `업데이트: ${intensiveUpdatedAt.toLocaleString()}` : ""}
+              </div>
+            )}
+          </div>
+
+          {/* ✅ 모바일: 요일별 카드 + 2열 그리드 */}
+          {isMobile ? (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              {INT_DAYS.map((day) => (
+                <MobileDayCard key={day} day={`${day}요일`}>
+                  <MobileGrid>
+                    {INT_TIMES.map((t) => {
+                      const k = keyOf(day, t);
+                      const cnt = intensiveCounts[k] || 0;
+                      const label = appliedLabel8(cnt);
+
+                      const isSel = existsIn(intensiveSelected, day, t);
+                      const full = cnt >= INT_LIMIT && !savedIntensive.some((s) => s.day === day && s.time === t);
+
+                      return (
+                        <button
+                          key={`${day}-${t}`}
+                          onClick={() => {
+                            if (full) return alert("해당 시간은 마감되었습니다.");
+                            toggleIntensiveSlot(day, t);
+                          }}
+                          disabled={full}
+                          style={btnChip(isSel, full)}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontWeight: 900 }}>{t}</div>
+                            <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
+                          </div>
+                          <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
+                            {cnt}/{INT_LIMIT}
+                            {isSel ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </MobileGrid>
+                </MobileDayCard>
+              ))}
             </div>
-          </div>
-
-          <div style={{ marginTop: 14, overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: 560,
-                border: "1px solid #e5e7eb",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <thead>
-                <tr style={{ background: "#f8fafc" }}>
-                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
-                    요일
-                  </th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
-                    시간 (상태)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {INT_DAYS.map((day) => (
-                  <tr key={day}>
-                    <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>{day}</td>
-                    <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                        {INT_TIMES.map((t) => {
-                          const k = keyOf(day, t);
-                          const cnt = intensiveCounts[k] || 0;
-                          const label = appliedLabel8(cnt);
-
-                          const isSel = existsIn(intensiveSelected, day, t);
-                          const full = cnt >= INT_LIMIT && !savedIntensive.some((s) => s.day === day && s.time === t);
-
-                          return (
-                            <button
-                              key={`${day}-${t}`}
-                              onClick={() => {
-                                if (full) {
-                                  alert("해당 시간은 마감되었습니다.");
-                                  return;
-                                }
-                                toggleIntensiveSlot(day, t);
-                              }}
-                              disabled={full}
-                              style={{
-                                ...btnChip(isSel, full),
-                                minWidth: 190,
-                              }}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                                <div style={{ fontWeight: 900 }}>{t}</div>
-                                <span
-                                  style={{
-                                    fontSize: 11,
-                                    padding: "4px 8px",
-                                    borderRadius: 999,
-                                    fontWeight: 900,
-                                    ...toneStyle(label.tone),
-                                  }}
-                                >
-                                  {label.text}
-                                </span>
-                              </div>
-
-                              {isSel && (
-                                <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
-                                  • 신청선택됨
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </td>
+          ) : (
+            // ✅ PC: 기존 표 유지
+            <div style={{ marginTop: 14, overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 560,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
+                      요일
+                    </th>
+                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
+                      시간 (상태)
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {INT_DAYS.map((day) => (
+                    <tr key={day}>
+                      <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>
+                        {day}
+                      </td>
+                      <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                          {INT_TIMES.map((t) => {
+                            const k = keyOf(day, t);
+                            const cnt = intensiveCounts[k] || 0;
+                            const label = appliedLabel8(cnt);
 
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                            const isSel = existsIn(intensiveSelected, day, t);
+                            const full = cnt >= INT_LIMIT && !savedIntensive.some((s) => s.day === day && s.time === t);
+
+                            return (
+                              <button
+                                key={`${day}-${t}`}
+                                onClick={() => {
+                                  if (full) return alert("해당 시간은 마감되었습니다.");
+                                  toggleIntensiveSlot(day, t);
+                                }}
+                                disabled={full}
+                                style={{ ...btnChip(isSel, full), minWidth: 190 }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                                  <div style={{ fontWeight: 900 }}>{t}</div>
+                                  <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
+                                </div>
+                                {isSel && (
+                                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
+                                    • 신청선택됨
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
             <div style={{ fontWeight: 900 }}>
               신청 선택:{" "}
               {intensiveSelected.length ? (
                 <span>
                   {intensiveSelected.map((s) => `${s.day} ${s.time}`).join(", ")}{" "}
                   <span style={{ color: "#6b7280", fontWeight: 900 }}>
-                    ({intensiveSelected.length}개 선택)
+                    ({intensiveSelected.length}개)
                   </span>
                 </span>
               ) : (
@@ -1335,135 +1451,124 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
             <button
               onClick={saveIntensive}
               style={{
-                padding: "10px 14px",
+                padding: "12px 14px",
                 borderRadius: 12,
                 border: "1px solid #2563eb",
                 background: "#2563eb",
                 color: "#fff",
                 fontWeight: 900,
                 cursor: "pointer",
+                width: isMobile ? "100%" : "auto",
               }}
             >
               집중학습반 저장
             </button>
+
+            {isMobile && intensiveUpdatedAt && (
+              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
+                업데이트: {intensiveUpdatedAt.toLocaleString()}
+              </div>
+            )}
           </div>
         </div>
       ) : null}
 
       {/* =========================
-          ✅ 고등부 + (오른쪽) 심화경시반 (요청 5,6)
-          ========================= */}
+          ✅ 고등부
+      ========================= */}
       {group === "high" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {/* 고등부 */}
-          <div style={{ ...card, padding: 14 }}>
-            <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>고등부(26년3월)</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-              월/화/목/금 중 자유 선택 (최대 4개) / 요일별 정원: {HIGH_LIMIT}명
-            </div>
+        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>고등부(26년3월)</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+            월/화/목/금 중 선택 (최대 4개) / 요일별 정원: {HIGH_LIMIT}명
+          </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {HIGH_DAYS.map((day) => {
-                const cnt = highCounts[day] || 0;
-                const label = appliedLabel6High(cnt);
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, minmax(160px, 1fr))", gap: 10 }}>
+            {HIGH_DAYS.map((day) => {
+              const cnt = highCounts[day] || 0;
+              const label = appliedLabel6High(cnt);
 
-                const full = cnt >= HIGH_LIMIT && !savedHighDays.includes(day);
-                const active = highSelectedDays.includes(day);
+              const full = cnt >= HIGH_LIMIT && !savedHighDays.includes(day);
+              const active = highSelectedDays.includes(day);
 
-                return (
-                  <button
-                    key={day}
-                    onClick={() => {
-                      if (full) {
-                        alert(`${day}요일은 마감되었습니다.`);
-                        return;
-                      }
-                      toggleHighDay(day);
-                    }}
-                    disabled={full}
-                    style={{
-                      ...btnChip(active, full),
-                      minWidth: 170,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontWeight: 900 }}>{day}요일</div>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          fontWeight: 900,
-                          ...toneStyle(label.tone),
-                        }}
-                      >
-                        {label.text}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
-                      현재 {cnt}/{HIGH_LIMIT}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={day}
+                  onClick={() => {
+                    if (full) return alert(`${day}요일은 마감되었습니다.`);
+                    toggleHighDay(day);
+                  }}
+                  disabled={full}
+                  style={btnChip(active, full)}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontWeight: 900 }}>{day}요일</div>
+                    <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
+                    {cnt}/{HIGH_LIMIT}
+                    {active ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
-            <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <div style={{ fontWeight: 900 }}>
-                선택:{" "}
-                {highSelectedDays.length ? (
-                  <span>
-                    {highSelectedDays.join(", ")}{" "}
-                    <span style={{ color: "#6b7280" }}>({highSelectedDays.length}개)</span>
-                  </span>
-                ) : (
-                  <span style={{ color: "#6b7280" }}>없음</span>
-                )}
-              </div>
-
-              <button
-                onClick={saveHigh}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: "1px solid #2563eb",
-                  background: "#2563eb",
-                  color: "#fff",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                고등부 저장
-              </button>
-
-              {highUpdatedAt && (
-                <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
-                  업데이트: {highUpdatedAt.toLocaleString()}
-                </div>
+          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+            <div style={{ fontWeight: 900 }}>
+              선택:{" "}
+              {highSelectedDays.length ? (
+                <span>
+                  {highSelectedDays.join(", ")}{" "}
+                  <span style={{ color: "#6b7280" }}>({highSelectedDays.length}개)</span>
+                </span>
+              ) : (
+                <span style={{ color: "#6b7280" }}>없음</span>
               )}
             </div>
-          </div>
 
-            
-         
+            <button
+              onClick={saveHigh}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid #2563eb",
+                background: "#2563eb",
+                color: "#fff",
+                fontWeight: 900,
+                cursor: "pointer",
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              고등부 저장
+            </button>
+
+            {highUpdatedAt && (
+              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
+                업데이트: {highUpdatedAt.toLocaleString()}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 
-     
       {/* =========================
-          ✅ 중등부 클리닉(기존 그대로)
-          ========================= */}
+          ✅ 중등부 클리닉
+      ========================= */}
       {group === "middleClinic" ? (
-        <div style={{ ...card, padding: 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>중등부 클리닉(정기) 신청</div>
+        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
+            중등부 클리닉(정기) 신청
+          </div>
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-            요일 + A/B반만 선택해서 저장해 주세요. (정원: 각 요일·반 {CLINIC_REGULAR_LIMIT}명)
+            요일 + A/B반 선택 후 저장 (정원: 각 요일·반 {CLINIC_REGULAR_LIMIT}명)
           </div>
 
-          {/* 요일 */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 800 }}>요일 선택</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+              요일 선택
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
               {weekdays.map((day) => {
                 const active = clinicRegular?.day === day;
                 return (
@@ -1471,12 +1576,13 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                     key={day}
                     onClick={() => handleSelectRegularDay(day)}
                     style={{
-                      padding: "8px 12px",
-                      borderRadius: 999,
+                      padding: "10px 8px",
+                      borderRadius: 12,
                       border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
                       background: active ? "#e7f1ff" : "#ffffff",
                       cursor: "pointer",
                       fontWeight: 900,
+                      fontSize: 13,
                     }}
                   >
                     {day}
@@ -1486,10 +1592,11 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
             </div>
           </div>
 
-          {/* A/B */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 800 }}>반 선택</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+              반 선택
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
               {CLINIC_BLOCKS.map((b) => {
                 const active = clinicRegular?.blockId === b.id;
                 const currentKey = clinicRegular?.day ? clinicKey(clinicRegular.day, b.id) : null;
@@ -1502,23 +1609,23 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                     onClick={() => handleSelectRegularBlock(b.id)}
                     disabled={full}
                     style={{
-                      padding: "8px 12px",
-                      borderRadius: 999,
+                      padding: "12px 12px",
+                      borderRadius: 12,
                       border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
                       background: active ? "#e7f1ff" : "#ffffff",
                       cursor: full ? "not-allowed" : "pointer",
                       opacity: full ? 0.6 : 1,
                       fontWeight: 900,
-                      whiteSpace: "nowrap",
+                      textAlign: "left",
                     }}
                     title={currentKey ? `현재 ${currentCount}명 / 정원 ${CLINIC_REGULAR_LIMIT}명` : undefined}
                   >
-                    {b.label}
-                    {currentKey && (
-                      <span style={{ marginLeft: 6, fontSize: 11, color: "#6b7280", fontWeight: 800 }}>
-                        ({currentCount}/{CLINIC_REGULAR_LIMIT})
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                      <span>{b.label}</span>
+                      <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
+                        {currentCount}/{CLINIC_REGULAR_LIMIT}
                       </span>
-                    )}
+                    </div>
                   </button>
                 );
               })}
@@ -1528,25 +1635,25 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
           <button
             onClick={saveRegularClinic}
             style={{
-              padding: "10px 14px",
+              padding: "12px 14px",
               borderRadius: 12,
               border: "1px solid #2563eb",
               background: "#2563eb",
               color: "white",
               fontWeight: 900,
               cursor: "pointer",
+              width: isMobile ? "100%" : "auto",
             }}
           >
             클리닉 저장
           </button>
 
-          {/* 저장된 클리닉 */}
           <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>저장된 클리닉 {studentName ? `: ${studentName}` : ""}</div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>저장된 클리닉</div>
             {savedClinic?.regular ? (
               <div style={{ color: "#111827", fontWeight: 900 }}>
                 {savedClinic.regular.day}{" "}
-                {savedClinic.regular.blockId === "A" ? "A(5시~7시)" : "B(7시~9시)"}
+                {savedClinic.regular.blockId === "A" ? "A(5~7)" : "B(7~9)"}
               </div>
             ) : (
               <div style={{ color: "#6b7280" }}>저장된 클리닉이 없습니다.</div>
@@ -1556,224 +1663,273 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
       ) : null}
 
       {/* =========================
-    ✅ 심화경시반 (독립 탭)
-========================= */}
-{group === "advanced" ? (
-  <div style={{ ...card, padding: 14 }}>
-    <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
-      심화경시반(26년3월)
-    </div>
-    <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-      신청 / 신청취소 버튼만 저장됩니다.
-    </div>
-
-    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <button
-        onClick={() => {
-          setAdvApplied(true);
-          saveAdvanced(true);
-        }}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: "1px solid #2563eb",
-          background: advApplied ? "#2563eb" : "#fff",
-          color: advApplied ? "#fff" : "#111827",
-          fontWeight: 900,
-          cursor: "pointer",
-        }}
-      >
-        신청
-      </button>
-
-      <button
-        onClick={() => {
-          setAdvApplied(false);
-          saveAdvanced(false);
-        }}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: "1px solid #e5e7eb",
-          background: "#fff",
-          color: "#111827",
-          fontWeight: 900,
-          cursor: "pointer",
-        }}
-      >
-        신청취소
-      </button>
-
-      <span
-        style={{
-          fontSize: 12,
-          fontWeight: 900,
-          color: savedAdvApplied ? "#166534" : "#6b7280",
-          background: savedAdvApplied ? "#dcfce7" : "#f3f4f6",
-          border: "1px solid #e5e7eb",
-          padding: "6px 10px",
-          borderRadius: 999,
-        }}
-      >
-        {savedAdvApplied ? "현재 상태: 신청" : "현재 상태: 미신청"}
-      </span>
-    </div>
-
-    <div
-      style={{
-        marginTop: 14,
-        padding: 12,
-        borderRadius: 12,
-        border: "1px solid #e5e7eb",
-        background: "#f9fafb",
-      }}
-    >
-      <div style={{ fontWeight: 900, marginBottom: 6 }}>전체 신청 인원</div>
-      <div style={{ fontSize: 22, fontWeight: 900 }}>{advCounts}명</div>
-    </div>
-  </div>
-) : null}
-
-
-      {/* =========================
-          ✅ 초등/중등 수강신청 (기존 그대로)
-          ========================= */}
-      {group === "elementary" || group === "middle" ? (
-        <div style={{ ...card, padding: 14 }}>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: 560,
-                border: "1px solid #e5e7eb",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <thead>
-                <tr style={{ background: "#f8fafc" }}>
-                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
-                    요일
-                  </th>
-                  <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
-                    시간 (상태)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentTable &&
-                  Object.entries(currentTable).map(([day, times]) => (
-                    <tr key={day}>
-                      <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>{day}</td>
-                      <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                          {times.map((t) => {
-                            const k = keyOf(day, t);
-                            const appliedCnt = countsApplied[k] || 0;
-
-                            const label = appliedLabel6(appliedCnt);
-
-                            const isCursor = cursor && cursor.day === day && cursor.time === t;
-                            const isAppliedSel = existsIn(selectedApplied, day, t);
-
-                            const isAppliedFull = appliedCnt >= 6;
-                            const isReserveFull = (countsReserve[k] || 0) >= 10;
-
-                            const disabledCompletely = !enrollConfig.isOpen
-                              ? true
-                              : !enrollConfig.reserveOnly
-                              ? isAppliedFull && isReserveFull
-                              : isReserveFull;
-
-                            return (
-                              <button
-                                key={`${day}-${t}`}
-                                onClick={() => {
-                                  if (!enrollConfig.isOpen) {
-                                    alert("현재 수강신청이 마감되었습니다.");
-                                    return;
-                                  }
-
-                                  setCursor({ day, time: t });
-
-                                  if (group === "elementary") toggleElementarySlot(day, t);
-                                  else if (group === "middle") toggleMiddleSlot(day, t);
-                                }}
-                                disabled={disabledCompletely}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 14,
-                                  border: `1px solid ${isAppliedSel || isCursor ? "#2563eb" : "#d1d5db"}`,
-                                  background: isAppliedSel ? "#e7f1ff" : isCursor ? "#f3f4ff" : "#fff",
-                                  color: disabledCompletely ? "#9ca3af" : "#111827",
-                                  fontWeight: 900,
-                                  cursor: disabledCompletely ? "not-allowed" : "pointer",
-                                  whiteSpace: "nowrap",
-                                  opacity: disabledCompletely ? 0.6 : 1,
-                                  textAlign: "left",
-                                  minWidth: 170,
-                                }}
-                              >
-                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                                  <div>{t}</div>
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      padding: "4px 8px",
-                                      borderRadius: 999,
-                                      fontWeight: 900,
-                                      ...toneStyle(label.tone),
-                                    }}
-                                  >
-                                    {label.text}
-                                  </span>
-                                </div>
-
-                                {enrollConfig.reserveOnly && (
-                                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#92400e" }}>
-                                    (예비만 접수)
-                                  </div>
-                                )}
-
-                                {isAppliedSel && (
-                                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
-                                    • 신청선택됨
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+          ✅ 심화경시반
+      ========================= */}
+      {group === "advanced" ? (
+        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
+            심화경시반(26년3월)
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+            신청 / 신청취소 버튼만 저장됩니다.
           </div>
 
-          {/* 저장 버튼 */}
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ minWidth: 220, color: "#374151", fontWeight: 800 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "stretch", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+            <button
+              onClick={() => {
+                setAdvApplied(true);
+                saveAdvanced(true);
+              }}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid #2563eb",
+                background: advApplied ? "#2563eb" : "#fff",
+                color: advApplied ? "#fff" : "#111827",
+                fontWeight: 900,
+                cursor: "pointer",
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              신청
+            </button>
+
+            <button
+              onClick={() => {
+                setAdvApplied(false);
+                saveAdvanced(false);
+              }}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                background: "#fff",
+                color: "#111827",
+                fontWeight: 900,
+                cursor: "pointer",
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              신청취소
+            </button>
+
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 900,
+                color: savedAdvApplied ? "#166534" : "#6b7280",
+                background: savedAdvApplied ? "#dcfce7" : "#f3f4f6",
+                border: "1px solid #e5e7eb",
+                padding: "10px 12px",
+                borderRadius: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {savedAdvApplied ? "현재 상태: 신청" : "현재 상태: 미신청"}
+            </span>
+          </div>
+
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>전체 신청 인원</div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>{advCounts}명</div>
+            {advUpdatedAt && (
+              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900, marginTop: 6 }}>
+                업데이트: {advUpdatedAt.toLocaleString()}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* =========================
+          ✅ 초등/중등 (모바일: 표 대신 카드+그리드)
+      ========================= */}
+      {group === "elementary" || group === "middle" ? (
+        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
+          {/* ✅ 모바일 UI */}
+          {isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {currentTable &&
+                Object.entries(currentTable).map(([day, times]) => (
+                  <MobileDayCard key={day} day={`${day}요일`}>
+                    <MobileGrid>
+                      {times.map((t) => {
+                        const k = keyOf(day, t);
+                        const appliedCnt = countsApplied[k] || 0;
+                        const label = appliedLabel6(appliedCnt);
+
+                        const isCursor = cursor && cursor.day === day && cursor.time === t;
+                        const isAppliedSel = existsIn(selectedApplied, day, t);
+
+                        const isAppliedFull = appliedCnt >= 6;
+                        const isReserveFull = (countsReserve[k] || 0) >= 10;
+
+                        const disabledCompletely = !enrollConfig.isOpen
+                          ? true
+                          : !enrollConfig.reserveOnly
+                          ? isAppliedFull && isReserveFull
+                          : isReserveFull;
+
+                        return (
+                          <button
+                            key={`${day}-${t}`}
+                            onClick={() => {
+                              if (!enrollConfig.isOpen) return alert("현재 수강신청이 마감되었습니다.");
+                              setCursor({ day, time: t });
+                              if (group === "elementary") toggleElementarySlot(day, t);
+                              else toggleMiddleSlot(day, t);
+                            }}
+                            disabled={disabledCompletely}
+                            style={{
+                              ...btnChip(isAppliedSel || isCursor, disabledCompletely),
+                              border: `1px solid ${(isAppliedSel || isCursor) ? "#2563eb" : "#d1d5db"}`,
+                              background: isAppliedSel ? "#e7f1ff" : isCursor ? "#f3f4ff" : "#fff",
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <div style={{ fontWeight: 900 }}>{t}</div>
+                              <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
+                            </div>
+
+                            <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
+                              {appliedCnt}/6
+                              {enrollConfig.reserveOnly ? <span style={{ color: "#92400e" }}> · 예비만</span> : ""}
+                              {isAppliedSel ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </MobileGrid>
+                  </MobileDayCard>
+                ))}
+            </div>
+          ) : (
+            // ✅ PC UI (기존 표 유지)
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 560,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
+                      요일
+                    </th>
+                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
+                      시간 (상태)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentTable &&
+                    Object.entries(currentTable).map(([day, times]) => (
+                      <tr key={day}>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>
+                          {day}
+                        </td>
+                        <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                            {times.map((t) => {
+                              const k = keyOf(day, t);
+                              const appliedCnt = countsApplied[k] || 0;
+
+                              const label = appliedLabel6(appliedCnt);
+
+                              const isCursor = cursor && cursor.day === day && cursor.time === t;
+                              const isAppliedSel = existsIn(selectedApplied, day, t);
+
+                              const isAppliedFull = appliedCnt >= 6;
+                              const isReserveFull = (countsReserve[k] || 0) >= 10;
+
+                              const disabledCompletely = !enrollConfig.isOpen
+                                ? true
+                                : !enrollConfig.reserveOnly
+                                ? isAppliedFull && isReserveFull
+                                : isReserveFull;
+
+                              return (
+                                <button
+                                  key={`${day}-${t}`}
+                                  onClick={() => {
+                                    if (!enrollConfig.isOpen) return alert("현재 수강신청이 마감되었습니다.");
+                                    setCursor({ day, time: t });
+                                    if (group === "elementary") toggleElementarySlot(day, t);
+                                    else toggleMiddleSlot(day, t);
+                                  }}
+                                  disabled={disabledCompletely}
+                                  style={{
+                                    padding: "10px 12px",
+                                    borderRadius: 14,
+                                    border: `1px solid ${isAppliedSel || isCursor ? "#2563eb" : "#d1d5db"}`,
+                                    background: isAppliedSel ? "#e7f1ff" : isCursor ? "#f3f4ff" : "#fff",
+                                    color: disabledCompletely ? "#9ca3af" : "#111827",
+                                    fontWeight: 900,
+                                    cursor: disabledCompletely ? "not-allowed" : "pointer",
+                                    whiteSpace: "nowrap",
+                                    opacity: disabledCompletely ? 0.6 : 1,
+                                    textAlign: "left",
+                                    minWidth: 170,
+                                  }}
+                                >
+                                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                                    <div>{t}</div>
+                                    <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
+                                  </div>
+
+                                  {enrollConfig.reserveOnly && (
+                                    <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#92400e" }}>
+                                      (예비만 접수)
+                                    </div>
+                                  )}
+
+                                  {isAppliedSel && (
+                                    <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
+                                      • 신청선택됨
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 저장 영역 */}
+          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+            <div style={{ color: "#374151", fontWeight: 900 }}>
               {cursor ? (
                 <span>
                   선택 대상: <b>{cursor.day}</b> <b>{cursor.time}</b>
                 </span>
               ) : (
-                <span style={{ color: "#6b7280" }}>표에서 시간대를 먼저 선택하세요</span>
+                <span style={{ color: "#6b7280" }}>시간대를 선택하세요</span>
               )}
             </div>
 
             <button
               onClick={saveSelections}
               style={{
-                padding: "10px 14px",
+                padding: "12px 14px",
                 borderRadius: 12,
                 border: "1px solid #2563eb",
                 background: "#2563eb",
                 color: "#fff",
                 fontWeight: 900,
                 cursor: "pointer",
+                width: isMobile ? "100%" : "auto",
               }}
             >
               저장
@@ -1781,7 +1937,7 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
           </div>
 
           {/* 선택 목록 */}
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 14 }}>
             <div style={{ fontWeight: 900, marginBottom: 8 }}>신청 선택(최대 2)</div>
             {selectedApplied.length === 0 ? (
               <div style={{ color: "#6b7280" }}>없음</div>
@@ -1799,6 +1955,7 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                       alignItems: "center",
                       gap: 10,
                       fontWeight: 900,
+                      fontSize: 13,
                     }}
                   >
                     {day} {time} {status === "reserve" ? "(예비)" : ""}
@@ -1822,8 +1979,10 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
           </div>
 
           {/* 저장된 내용 */}
-          <div style={{ marginTop: 18, padding: 12, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb" }}>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>저장된 내용 {studentName ? `: ${studentName}` : ""}</div>
+          <div style={{ marginTop: 14, padding: 12, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb" }}>
+            <div style={{ fontWeight: 900, marginBottom: 8 }}>
+              저장된 내용 {studentName ? `: ${studentName}` : ""}
+            </div>
             {!studentName ? (
               <div style={{ color: "#6b7280" }}>학생 정보 로딩 중…</div>
             ) : (
@@ -1834,7 +1993,8 @@ const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "adva
                     savedApplied
                       .map((s) => {
                         const g = s.group === "elementary" ? "초등부" : "중등부";
-                        const tag = s.status === "reserve" || s?.label === "신청(예비)" ? " (예비)" : "";
+                        const tag =
+                          s.status === "reserve" || s?.label === "신청(예비)" ? " (예비)" : "";
                         return `${g} ${s.day} ${s.time}${tag}`;
                       })
                       .join(", ")

@@ -4,8 +4,15 @@ import { db } from "../firebase";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 export default function MonthlyPaymentPage() {
-  const studentId = (localStorage.getItem("studentId") || "").trim();
-  const studentName = (localStorage.getItem("studentName") || "").trim();
+  const parentPhone = (localStorage.getItem("parentPhone") || "").trim();
+
+  // ✅ localStorage에서 시작값
+  const [studentId, setStudentId] = useState(() => (localStorage.getItem("studentId") || "").trim());
+  const [studentName, setStudentName] = useState(() => (localStorage.getItem("studentName") || "").trim());
+
+  // ✅ “아이 변경” 드롭다운용
+  const [children, setChildren] = useState([]); // [{id, name}]
+  const [selectedChildId, setSelectedChildId] = useState(() => (localStorage.getItem("studentId") || "").trim());
 
   // ✅ viewMonth: 선택 월 (년도/달 이동)
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
@@ -25,31 +32,70 @@ export default function MonthlyPaymentPage() {
     return `${viewYear}-${String(viewMonth).padStart(2, "0")}`;
   }, [viewYear, viewMonth]);
 
-  // ✅ monthly_payments 실시간 구독 (where만, 정렬은 앱에서)
+  // ✅✅ 1) 다자녀 목록 불러오기 (students에서 parentPhone 기준)
   useEffect(() => {
-    if (!studentId) return;
+    if (!parentPhone) return;
 
-    const qy = query(
-      collection(db, "monthly_payments"),
-      where("studentId", "==", studentId)
-    );
+    const qy = query(collection(db, "students"), where("parentPhone", "==", parentPhone));
 
     const unsub = onSnapshot(
       qy,
       (snap) => {
-        const arr = snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
+        const arr = snap.docs.map((d) => {
+          const data = d.data() || {};
+          // ⚠️ 학생 이름 필드가 name이 아니면 여기만 바꿔줘!
+          const name = String(data.name || data.studentName || data.student || "").trim();
+          return { id: d.id, name: name || "(이름 없음)" };
+        });
 
-        // ✅ month 내림차순 정렬 (문자열 "YYYY-MM" 이므로 compare 가능)
+        // 이름순 정렬 (원하면 빼도 됨)
+        arr.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+
+        setChildren(arr);
+
+        // 현재 선택된 studentId가 목록에 없으면 첫번째로 자동 세팅
+        const exists = arr.some((x) => x.id === selectedChildId);
+        if (!exists && arr.length > 0) {
+          setSelectedChildId(arr[0].id);
+        }
+      },
+      (err) => console.error("students snapshot error:", err)
+    );
+
+    return () => unsub();
+  }, [parentPhone]);
+
+  // ✅✅ 2) selectedChildId가 바뀌면 실제 studentId/studentName을 업데이트 + localStorage 저장
+  useEffect(() => {
+    if (!selectedChildId) return;
+
+    const found = children.find((c) => c.id === selectedChildId);
+    const nextName = found?.name || "";
+
+    setStudentId(selectedChildId);
+    setStudentName(nextName);
+
+    localStorage.setItem("studentId", selectedChildId);
+    localStorage.setItem("studentName", nextName);
+
+    // 월 이동 펼침 상태도 깔끔히 초기화
+    setOpenId(null);
+  }, [selectedChildId, children]);
+
+  // ✅ monthly_payments 실시간 구독 (학생 기준)
+  useEffect(() => {
+    if (!studentId) return;
+
+    const qy = query(collection(db, "monthly_payments"), where("studentId", "==", studentId));
+
+    const unsub = onSnapshot(
+      qy,
+      (snap) => {
+        const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         arr.sort((a, b) => String(b.month || "").localeCompare(String(a.month || "")));
-
         setRows(arr);
       },
-      (err) => {
-        console.error("monthly_payments snapshot error:", err);
-      }
+      (err) => console.error("monthly_payments snapshot error:", err)
     );
 
     return () => unsub();
@@ -60,15 +106,14 @@ export default function MonthlyPaymentPage() {
     return rows.find((r) => String(r.month || "") === nowKey) || null;
   }, [rows, nowKey]);
 
-  // ✅ 선택 월(년도/달 이동) 기준으로 필터링한 리스트
+  // ✅ 선택 월 기준 필터
   const filteredRows = useMemo(() => {
-    // viewKey와 같은 달만 보여주기
     return rows.filter((r) => String(r.month || "") === viewKey);
   }, [rows, viewKey]);
 
   // ✅ 월 이동
   const prevMonth = () => {
-    const d = new Date(viewYear, viewMonth - 2, 1); // JS month 0-based
+    const d = new Date(viewYear, viewMonth - 2, 1);
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth() + 1);
   };
@@ -83,6 +128,26 @@ export default function MonthlyPaymentPage() {
       <div style={{ padding: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>월 결제</h1>
         <div style={{ color: "#6b7280" }}>자녀를 먼저 선택해 주세요.</div>
+
+        {/* 예외: 혹시 children이 이미 불러와졌으면 여기서도 선택 가능 */}
+        {children.length > 0 && (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+            <select
+              value={selectedChildId}
+              onChange={(e) => setSelectedChildId(e.target.value)}
+              style={selectStyle}
+            >
+              {children.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <button style={btnPrimary} onClick={() => setSelectedChildId(selectedChildId)}>
+              아이 변경
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -98,7 +163,51 @@ export default function MonthlyPaymentPage() {
         할인 적용 여부를 한눈에 확인하실 수 있습니다.
       </div>
 
-      {/* ✅ 년/월 이동 (요청사항) */}
+      {/* ✅✅ 스샷 느낌 “아이 선택 + 아이변경” (페이지 안에서 바로 변경) */}
+      <div style={switcherWrap}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 900, fontSize: 13, color: "#374151" }}>아이 선택</div>
+
+          <select
+            value={selectedChildId}
+            onChange={(e) => setSelectedChildId(e.target.value)}
+            style={selectStyle}
+          >
+            {children.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            style={btnPrimary}
+            onClick={() => {
+              // 이미 select 변경만으로 적용되지만,
+              // 버튼이 있으면 “확정” 느낌이라 학부모가 더 편해함
+              const found = children.find((c) => c.id === selectedChildId);
+              if (found) {
+                localStorage.setItem("studentId", found.id);
+                localStorage.setItem("studentName", found.name);
+                setStudentId(found.id);
+                setStudentName(found.name);
+                setOpenId(null);
+              }
+            }}
+          >
+            아이 변경
+          </button>
+
+          <button
+            style={btnOutline}
+            onClick={() => (window.location.hash = "#/payment-history")}
+          >
+            지난 결제(횟수제)
+          </button>
+        </div>
+      </div>
+
+      {/* ✅ 년/월 이동 */}
       <div
         style={{
           marginTop: 14,
@@ -109,10 +218,7 @@ export default function MonthlyPaymentPage() {
           gap: 10,
         }}
       >
-        <button
-          onClick={prevMonth}
-          style={btnGhost}
-        >
+        <button onClick={prevMonth} style={btnGhost}>
           ◀ 이전달
         </button>
 
@@ -123,20 +229,13 @@ export default function MonthlyPaymentPage() {
           </span>
         </div>
 
-        <button
-          onClick={nextMonth}
-          style={btnGhost}
-        >
+        <button onClick={nextMonth} style={btnGhost}>
           다음달 ▶
         </button>
       </div>
 
-      {/* ✅ 이번 달 카드(현 시간 기준) */}
-      {currentDoc ? (
-        <CurrentMonthCard data={currentDoc} />
-      ) : (
-        <NoCurrentMonthCard nowKey={nowKey} />
-      )}
+      {/* ✅ 이번 달 카드 */}
+      {currentDoc ? <CurrentMonthCard data={currentDoc} /> : <NoCurrentMonthCard nowKey={nowKey} />}
 
       <div style={{ height: 12 }} />
       <div style={{ borderTop: "1px solid #e5e7eb" }} />
@@ -146,9 +245,8 @@ export default function MonthlyPaymentPage() {
         📂 월별 결제 내역 (선택한 달: {formatMonthLabel(viewKey)})
       </div>
 
-      {/* ✅ 선택한 달에 데이터 없으면 안내 */}
       {filteredRows.length === 0 ? (
-        <div style={{ color: "#6b7280", fontSize: 13, lineHeight: 1.6, padding: 12, border: "1px solid #e5e7eb", borderRadius: 12 }}>
+        <div style={emptyBox}>
           {formatMonthLabel(viewKey)} 기준 결제 내역이 없습니다.
         </div>
       ) : (
@@ -163,21 +261,15 @@ export default function MonthlyPaymentPage() {
           ))}
         </div>
       )}
-
-      {/* ✅ 참고: 전체 월을 다 보려면 아래 주석 해제하고 filteredRows 대신 rows로 렌더하면 됨 */}
-      {/* 
-      <div style={{ marginTop: 14, fontWeight: 900 }}>전체 월별 내역</div>
-      {rows.map(...)}
-      */}
     </div>
   );
 }
 
-/* ───────────────────────────── 컴포넌트 ───────────────────────────── */
+/* ───────────────────────────── 컴포넌트 (기존 그대로) ───────────────────────────── */
 
 function CurrentMonthCard({ data }) {
   const monthKey = String(data.month || "");
-  const summary = (data.summary || {});
+  const summary = data.summary || {};
 
   const baseTotal = summary.baseTotal;
   const discountTotal = summary.discountTotal;
@@ -191,41 +283,21 @@ function CurrentMonthCard({ data }) {
 
   const bgColor = isPaid ? "#ecfdf3" : isPartial ? "#eef2ff" : "#fffbeb";
   const borderColor = isPaid ? "#4ade80" : isPartial ? "#a5b4fc" : "#facc15";
-
   const statusText = isPaid ? "결제 완료" : isPartial ? "일부 결제" : "미결제 · 확인 필요";
 
   return (
-    <div
-      style={{
-        width: "100%",
-        marginTop: 12,
-        padding: 12,
-        borderRadius: 12,
-        border: `1px solid ${borderColor}`,
-        background: bgColor,
-      }}
-    >
+    <div style={{ width: "100%", marginTop: 12, padding: 12, borderRadius: 12, border: `1px solid ${borderColor}`, background: bgColor }}>
       <div style={{ fontWeight: 900, fontSize: 15 }}>📌 이번 달 결제 상태</div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
         <StatusChip text={statusText} isPaid={isPaid} isPartial={isPartial} />
-        {monthKey && (
-          <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
-            {formatMonthLabel(monthKey)}
-          </div>
-        )}
+        {monthKey && <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 800 }}>{formatMonthLabel(monthKey)}</div>}
       </div>
 
       <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.55 }}>
         {baseTotal != null && <div>기본 수업료: {formatWon(baseTotal)}</div>}
-        {discountTotal != null && (
-          <div style={{ color: "#ef4444" }}>할인 합계: -{formatWon(discountTotal)}</div>
-        )}
-        {finalTotal != null && (
-          <div style={{ marginTop: 4, fontWeight: 900, fontSize: 14 }}>
-            이번 달 최종 결제 금액: {formatWon(finalTotal)}
-          </div>
-        )}
+        {discountTotal != null && <div style={{ color: "#ef4444" }}>할인 합계: -{formatWon(discountTotal)}</div>}
+        {finalTotal != null && <div style={{ marginTop: 4, fontWeight: 900, fontSize: 14 }}>이번 달 최종 결제 금액: {formatWon(finalTotal)}</div>}
       </div>
 
       {discountTotal != null && Number(discountTotal) > 0 && (
@@ -234,17 +306,8 @@ function CurrentMonthCard({ data }) {
         </div>
       )}
 
-      {memo && (
-        <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
-          비고: {memo}
-        </div>
-      )}
-
-      {updatedAt && (
-        <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
-          업데이트: {updatedAt}
-        </div>
-      )}
+      {memo && <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>비고: {memo}</div>}
+      {updatedAt && <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>업데이트: {updatedAt}</div>}
 
       <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
         ※ 결제 상태와 금액이 다를 경우 언제든지 학원으로 편하게 문의해 주세요.
@@ -255,16 +318,7 @@ function CurrentMonthCard({ data }) {
 
 function NoCurrentMonthCard({ nowKey }) {
   return (
-    <div
-      style={{
-        width: "100%",
-        marginTop: 12,
-        padding: 12,
-        borderRadius: 12,
-        border: "1px solid #bfdbfe",
-        background: "#eff6ff",
-      }}
-    >
+    <div style={{ width: "100%", marginTop: 12, padding: 12, borderRadius: 12, border: "1px solid #bfdbfe", background: "#eff6ff" }}>
       <div style={{ fontWeight: 900, fontSize: 15 }}>📌 이번 달 결제 정보</div>
       <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55 }}>
         {formatMonthLabel(nowKey)} 기준 결제 내역이 아직 저장되지 않았습니다.
@@ -278,7 +332,7 @@ function NoCurrentMonthCard({ nowKey }) {
 
 function HistoryItem({ row, open, onToggle }) {
   const monthKey = String(row.month || "");
-  const summary = (row.summary || {});
+  const summary = row.summary || {};
   const baseTotal = summary.baseTotal;
   const discountTotal = summary.discountTotal;
   const finalTotal = summary.finalTotal;
@@ -296,25 +350,13 @@ function HistoryItem({ row, open, onToggle }) {
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
       <button
         onClick={onToggle}
-        style={{
-          width: "100%",
-          textAlign: "left",
-          border: "none",
-          background: "transparent",
-          padding: "12px 12px",
-          cursor: "pointer",
-        }}
+        style={{ width: "100%", textAlign: "left", border: "none", background: "transparent", padding: "12px 12px", cursor: "pointer" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ fontWeight: 900, fontSize: 13, flex: 1 }}>
             {monthKey ? formatMonthLabel(monthKey) : "기간 미지정"}
           </div>
-          <StatusChip
-            text={isPaid ? "결제 완료" : isPartial ? "일부 결제" : "미결제"}
-            isPaid={isPaid}
-            isPartial={isPartial}
-            small
-          />
+          <StatusChip text={isPaid ? "결제 완료" : isPartial ? "일부 결제" : "미결제"} isPaid={isPaid} isPartial={isPartial} small />
         </div>
 
         <div style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -337,13 +379,9 @@ function HistoryItem({ row, open, onToggle }) {
 
       {open && (
         <div style={{ padding: "0 12px 12px 12px" }}>
-          {/* 반별 상세 */}
           {partials.length > 0 && (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 8 }}>
-                • 반별 상세 내역
-              </div>
-
+              <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 8 }}>• 반별 상세 내역</div>
               <div style={{ display: "grid", gap: 8 }}>
                 {partials.map((p, idx) => (
                   <PartialCard key={idx} data={p} />
@@ -352,26 +390,9 @@ function HistoryItem({ row, open, onToggle }) {
             </div>
           )}
 
-          {/* 종합 비고 */}
-          {memo && (
-            <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
-              종합 비고: {memo}
-            </div>
-          )}
-
-          {/* 업데이트 */}
-          {updatedAt && (
-            <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
-              업데이트: {updatedAt}
-            </div>
-          )}
-
-          {/* (참고) baseTotal 표시 원하면 주석 해제 */}
-          {baseTotal != null && (
-            <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
-              기본 합계: {formatWon(baseTotal)}
-            </div>
-          )}
+          {memo && <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>종합 비고: {memo}</div>}
+          {updatedAt && <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>업데이트: {updatedAt}</div>}
+          {baseTotal != null && <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>기본 합계: {formatWon(baseTotal)}</div>}
         </div>
       )}
     </div>
@@ -398,21 +419,13 @@ function PartialCard({ data }) {
   return (
     <div style={{ background: "#f9fafb", borderRadius: 10, padding: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ fontWeight: 900, fontSize: 12, flex: 1 }}>
-          {classType || "반 이름 미지정"}
-        </div>
-        {isPaidPartial && (
-          <div style={{ fontSize: 11, color: "#166534", fontWeight: 900 }}>
-            결제 완료
-          </div>
-        )}
+        <div style={{ fontWeight: 900, fontSize: 12, flex: 1 }}>{classType || "반 이름 미지정"}</div>
+        {isPaidPartial && <div style={{ fontSize: 11, color: "#166534", fontWeight: 900 }}>결제 완료</div>}
       </div>
 
       <div style={{ marginTop: 6, fontSize: 11, color: "#111827", display: "flex", gap: 10, flexWrap: "wrap" }}>
         {baseAmount != null && <span>기본: {formatWon(baseAmount)}</span>}
-        {discountAmount != null && Number(discountAmount) > 0 && (
-          <span style={{ color: "#ef4444" }}>할인: -{formatWon(discountAmount)}</span>
-        )}
+        {discountAmount != null && Number(discountAmount) > 0 && <span style={{ color: "#ef4444" }}>할인: -{formatWon(discountAmount)}</span>}
         {finalAmount != null && <span style={{ fontWeight: 900 }}>최종: {formatWon(finalAmount)}</span>}
       </div>
 
@@ -423,39 +436,7 @@ function PartialCard({ data }) {
         </div>
       )}
 
-      {logs.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 6 }}>할인 적용 내역:</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {logs.map((lg, i) => {
-              const date = String(lg.date || "");
-              const reason = String(lg.reasonCategory || "기타");
-              const amount = lg.amount;
-              return (
-                <span
-                  key={i}
-                  style={{
-                    fontSize: 10,
-                    color: "#6b7280",
-                    border: "1px solid #e5e7eb",
-                    background: "#fff",
-                    padding: "4px 8px",
-                    borderRadius: 999,
-                  }}
-                >
-                  {`${date || "-"} · ${reason} · -${formatWon(amount)}`}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {memo && (
-        <div style={{ marginTop: 6, fontSize: 10, color: "#6b7280" }}>
-          비고: {memo}
-        </div>
-      )}
+      {memo && <div style={{ marginTop: 6, fontSize: 10, color: "#6b7280" }}>비고: {memo}</div>}
     </div>
   );
 }
@@ -485,6 +466,7 @@ function StatusChip({ text, isPaid, isPartial, small = false }) {
   );
 }
 
+
 /* ───────────────────────────── 유틸 ───────────────────────────── */
 
 function formatWon(value) {
@@ -500,8 +482,6 @@ function formatWon(value) {
 
 function formatDateTime(v) {
   if (!v) return null;
-
-  // Firestore Timestamp면 toDate()
   const dt = typeof v?.toDate === "function" ? v.toDate() : new Date(v);
   if (isNaN(dt.getTime())) return null;
 
@@ -514,7 +494,6 @@ function formatDateTime(v) {
 }
 
 function formatMonthLabel(monthKey) {
-  // "2026-03" -> "2026년 3월"
   try {
     const [yy, mm] = String(monthKey).split("-");
     const y = Number(yy);
@@ -524,6 +503,26 @@ function formatMonthLabel(monthKey) {
   return String(monthKey);
 }
 
+/* ───────────────────────────── 스타일 ───────────────────────────── */
+
+const switcherWrap = {
+  marginTop: 14,
+  padding: 12,
+  borderRadius: 16,
+  border: "1px solid #e5e7eb",
+  background: "#fff",
+};
+
+const selectStyle = {
+  minWidth: 180,
+  height: 40,
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  padding: "0 12px",
+  fontWeight: 900,
+  outline: "none",
+};
+
 const btnGhost = {
   padding: "8px 10px",
   border: "1px solid #d1d5db",
@@ -531,4 +530,38 @@ const btnGhost = {
   background: "#fff",
   cursor: "pointer",
   fontWeight: 900,
+};
+
+const btnPrimary = {
+  height: 40,
+  padding: "0 14px",
+  borderRadius: 12,
+  border: "none",
+  background: "#111827",
+  color: "#fff",
+  cursor: "pointer",
+  fontWeight: 900,
+  fontSize: 13,
+  whiteSpace: "nowrap",
+};
+
+const btnOutline = {
+  height: 40,
+  padding: "0 14px",
+  borderRadius: 12,
+  border: "1px solid #e5e7eb",
+  background: "#fff",
+  cursor: "pointer",
+  fontWeight: 900,
+  fontSize: 13,
+  whiteSpace: "nowrap",
+};
+
+const emptyBox = {
+  color: "#6b7280",
+  fontSize: 13,
+  lineHeight: 1.6,
+  padding: 12,
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
 };
