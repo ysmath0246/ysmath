@@ -6,20 +6,22 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 export default function MonthlyPaymentPage() {
   const parentPhone = (localStorage.getItem("parentPhone") || "").trim();
 
-  // ✅ localStorage에서 시작값
+  // ✅ localStorage에서 현재 확정된 아이
   const [studentId, setStudentId] = useState(() => (localStorage.getItem("studentId") || "").trim());
   const [studentName, setStudentName] = useState(() => (localStorage.getItem("studentName") || "").trim());
 
-  // ✅ “아이 변경” 드롭다운용
+  // ✅ 자녀 목록
   const [children, setChildren] = useState([]); // [{id, name}]
-  const [selectedChildId, setSelectedChildId] = useState(() => (localStorage.getItem("studentId") || "").trim());
 
-  // ✅ viewMonth: 선택 월 (년도/달 이동)
+  // ✅ 드롭다운은 "임시 선택" (버튼 눌러야 확정 적용)
+  const [pendingChildId, setPendingChildId] = useState(() => (localStorage.getItem("studentId") || "").trim());
+
+  // ✅ viewMonth: 선택 월
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1); // 1~12
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
 
-  const [rows, setRows] = useState([]); // 월결제 문서들
-  const [openId, setOpenId] = useState(null); // 펼친 항목 id
+  const [rows, setRows] = useState([]);
+  const [openId, setOpenId] = useState(null);
 
   // 🔹 현 시간 기준 이번 달 key
   const nowKey = useMemo(() => {
@@ -32,7 +34,7 @@ export default function MonthlyPaymentPage() {
     return `${viewYear}-${String(viewMonth).padStart(2, "0")}`;
   }, [viewYear, viewMonth]);
 
-  // ✅✅ 1) 다자녀 목록 불러오기 (students에서 parentPhone 기준)
+  // ✅ 1) 다자녀 목록 불러오기
   useEffect(() => {
     if (!parentPhone) return;
 
@@ -43,46 +45,43 @@ export default function MonthlyPaymentPage() {
       (snap) => {
         const arr = snap.docs.map((d) => {
           const data = d.data() || {};
-          // ⚠️ 학생 이름 필드가 name이 아니면 여기만 바꿔줘!
+          // ⚠️ 학생 이름 필드가 다르면 여기만 바꿔줘!
           const name = String(data.name || data.studentName || data.student || "").trim();
           return { id: d.id, name: name || "(이름 없음)" };
         });
 
-        // 이름순 정렬 (원하면 빼도 됨)
         arr.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-
         setChildren(arr);
 
-        // 현재 선택된 studentId가 목록에 없으면 첫번째로 자동 세팅
-        const exists = arr.some((x) => x.id === selectedChildId);
-        if (!exists && arr.length > 0) {
-          setSelectedChildId(arr[0].id);
+        // pendingChildId가 비었거나 목록에 없으면 첫 아이로 맞추기
+        const nextPending =
+          arr.some((x) => x.id === pendingChildId) ? pendingChildId : (arr[0]?.id || "");
+        setPendingChildId(nextPending);
+
+        // 확정된 studentId도 목록에 없으면 첫 아이로 자동 확정
+        if (!arr.some((x) => x.id === studentId) && arr.length > 0) {
+          applyChild(arr[0].id, arr[0].name);
         }
       },
       (err) => console.error("students snapshot error:", err)
     );
 
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentPhone]);
 
-  // ✅✅ 2) selectedChildId가 바뀌면 실제 studentId/studentName을 업데이트 + localStorage 저장
-  useEffect(() => {
-    if (!selectedChildId) return;
+  // ✅ 아이 확정 적용 함수 (localStorage + state + 펼침 초기화)
+  const applyChild = (id, name) => {
+    setStudentId(id);
+    setStudentName(name);
 
-    const found = children.find((c) => c.id === selectedChildId);
-    const nextName = found?.name || "";
+    localStorage.setItem("studentId", id);
+    localStorage.setItem("studentName", name);
 
-    setStudentId(selectedChildId);
-    setStudentName(nextName);
-
-    localStorage.setItem("studentId", selectedChildId);
-    localStorage.setItem("studentName", nextName);
-
-    // 월 이동 펼침 상태도 깔끔히 초기화
     setOpenId(null);
-  }, [selectedChildId, children]);
+  };
 
-  // ✅ monthly_payments 실시간 구독 (학생 기준)
+  // ✅ 2) monthly_payments 실시간 구독 (확정된 studentId 기준)
   useEffect(() => {
     if (!studentId) return;
 
@@ -101,12 +100,12 @@ export default function MonthlyPaymentPage() {
     return () => unsub();
   }, [studentId]);
 
-  // ✅ 이번 달 문서(없을 수 있음)
+  // ✅ 이번 달 문서
   const currentDoc = useMemo(() => {
     return rows.find((r) => String(r.month || "") === nowKey) || null;
   }, [rows, nowKey]);
 
-  // ✅ 선택 월 기준 필터
+  // ✅ 선택 월 필터
   const filteredRows = useMemo(() => {
     return rows.filter((r) => String(r.month || "") === viewKey);
   }, [rows, viewKey]);
@@ -123,39 +122,13 @@ export default function MonthlyPaymentPage() {
     setViewMonth(d.getMonth() + 1);
   };
 
-  if (!studentId || !studentName) {
-    return (
-      <div style={{ padding: 16 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>월 결제</h1>
-        <div style={{ color: "#6b7280" }}>자녀를 먼저 선택해 주세요.</div>
-
-        {/* 예외: 혹시 children이 이미 불러와졌으면 여기서도 선택 가능 */}
-        {children.length > 0 && (
-          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <select
-              value={selectedChildId}
-              onChange={(e) => setSelectedChildId(e.target.value)}
-              style={selectStyle}
-            >
-              {children.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <button style={btnPrimary} onClick={() => setSelectedChildId(selectedChildId)}>
-              아이 변경
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
+  // ✅ 아직 아이가 확정 안된 경우 (그래도 상단에서 선택 가능하게)
+  const hasChildSelected = Boolean(studentId && studentName);
 
   return (
     <div style={{ padding: 16, maxWidth: 820, margin: "0 auto" }}>
       <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 6 }}>
-        💳 월 수업료 결제 현황 — {studentName}
+        💳 월 수업료 결제 현황 {hasChildSelected ? `— ${studentName}` : ""}
       </h1>
 
       <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
@@ -163,109 +136,122 @@ export default function MonthlyPaymentPage() {
         할인 적용 여부를 한눈에 확인하실 수 있습니다.
       </div>
 
-      {/* ✅✅ 스샷 느낌 “아이 선택 + 아이변경” (페이지 안에서 바로 변경) */}
+      {/* ✅✅ 스샷 느낌: 아이 선택 + 아이 변경 (페이지 안에서) */}
       <div style={switcherWrap}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <div style={{ fontWeight: 900, fontSize: 13, color: "#374151" }}>아이 선택</div>
 
           <select
-            value={selectedChildId}
-            onChange={(e) => setSelectedChildId(e.target.value)}
+            value={pendingChildId}
+            onChange={(e) => setPendingChildId(e.target.value)}
             style={selectStyle}
           >
-            {children.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {children.length === 0 ? (
+              <option value="">(자녀 정보 없음)</option>
+            ) : (
+              children.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))
+            )}
           </select>
 
           <button
             style={btnPrimary}
             onClick={() => {
-              // 이미 select 변경만으로 적용되지만,
-              // 버튼이 있으면 “확정” 느낌이라 학부모가 더 편해함
-              const found = children.find((c) => c.id === selectedChildId);
-              if (found) {
-                localStorage.setItem("studentId", found.id);
-                localStorage.setItem("studentName", found.name);
-                setStudentId(found.id);
-                setStudentName(found.name);
-                setOpenId(null);
-              }
+              const found = children.find((c) => c.id === pendingChildId);
+              if (!found) return;
+              applyChild(found.id, found.name);
             }}
+            disabled={!pendingChildId}
           >
             아이 변경
           </button>
 
+          {/* 필요 없으면 삭제해도 됨 */}
           <button
             style={btnOutline}
             onClick={() => (window.location.hash = "#/payment-history")}
           >
             지난 결제(횟수제)
           </button>
+
+          {/* 현재 선택 표시 */}
+          {hasChildSelected && (
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
+              현재 선택: {studentName}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ✅ 년/월 이동 */}
-      <div
-        style={{
-          marginTop: 14,
-          marginBottom: 12,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <button onClick={prevMonth} style={btnGhost}>
-          ◀ 이전달
-        </button>
-
-        <div style={{ fontWeight: 900, fontSize: 16 }}>
-          {viewYear}년 {viewMonth}월
-          <span style={{ marginLeft: 10, fontSize: 12, color: "#6b7280", fontWeight: 700 }}>
-            (이번달: {formatMonthLabel(nowKey)})
-          </span>
-        </div>
-
-        <button onClick={nextMonth} style={btnGhost}>
-          다음달 ▶
-        </button>
-      </div>
-
-      {/* ✅ 이번 달 카드 */}
-      {currentDoc ? <CurrentMonthCard data={currentDoc} /> : <NoCurrentMonthCard nowKey={nowKey} />}
-
-      <div style={{ height: 12 }} />
-      <div style={{ borderTop: "1px solid #e5e7eb" }} />
-      <div style={{ height: 10 }} />
-
-      <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 8 }}>
-        📂 월별 결제 내역 (선택한 달: {formatMonthLabel(viewKey)})
-      </div>
-
-      {filteredRows.length === 0 ? (
-        <div style={emptyBox}>
-          {formatMonthLabel(viewKey)} 기준 결제 내역이 없습니다.
+      {/* ✅ 아이 확정이 안되면 안내만 */}
+      {!hasChildSelected ? (
+        <div style={{ marginTop: 12, color: "#6b7280", fontSize: 13 }}>
+          자녀를 선택 후 <b>아이 변경</b> 버튼을 눌러주세요.
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {filteredRows.map((row) => (
-            <HistoryItem
-              key={row.id}
-              row={row}
-              open={openId === row.id}
-              onToggle={() => setOpenId(openId === row.id ? null : row.id)}
-            />
-          ))}
-        </div>
+        <>
+          {/* ✅ 년/월 이동 */}
+          <div
+            style={{
+              marginTop: 14,
+              marginBottom: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+            }}
+          >
+            <button onClick={prevMonth} style={btnGhost}>
+              ◀ 이전달
+            </button>
+
+            <div style={{ fontWeight: 900, fontSize: 16 }}>
+              {viewYear}년 {viewMonth}월
+              <span style={{ marginLeft: 10, fontSize: 12, color: "#6b7280", fontWeight: 700 }}>
+                (이번달: {formatMonthLabel(nowKey)})
+              </span>
+            </div>
+
+            <button onClick={nextMonth} style={btnGhost}>
+              다음달 ▶
+            </button>
+          </div>
+
+          {/* ✅ 이번 달 카드 */}
+          {currentDoc ? <CurrentMonthCard data={currentDoc} /> : <NoCurrentMonthCard nowKey={nowKey} />}
+
+          <div style={{ height: 12 }} />
+          <div style={{ borderTop: "1px solid #e5e7eb" }} />
+          <div style={{ height: 10 }} />
+
+          <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 8 }}>
+            📂 월별 결제 내역 (선택한 달: {formatMonthLabel(viewKey)})
+          </div>
+
+          {filteredRows.length === 0 ? (
+            <div style={emptyBox}>{formatMonthLabel(viewKey)} 기준 결제 내역이 없습니다.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {filteredRows.map((row) => (
+                <HistoryItem
+                  key={row.id}
+                  row={row}
+                  open={openId === row.id}
+                  onToggle={() => setOpenId(openId === row.id ? null : row.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-/* ───────────────────────────── 컴포넌트 (기존 그대로) ───────────────────────────── */
+/* ───────────────────────────── 컴포넌트 ───────────────────────────── */
 
 function CurrentMonthCard({ data }) {
   const monthKey = String(data.month || "");
@@ -436,11 +422,40 @@ function PartialCard({ data }) {
         </div>
       )}
 
+      {logs.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 6 }}>할인 적용 내역:</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {logs.map((lg, i) => {
+              const date = String(lg.date || "");
+              const reason = String(lg.reasonCategory || "기타");
+              const amount = lg.amount;
+              return (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 10,
+                    color: "#6b7280",
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
+                    padding: "4px 8px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {`${date || "-"} · ${reason} · -${formatWon(amount)}`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {memo && <div style={{ marginTop: 6, fontSize: 10, color: "#6b7280" }}>비고: {memo}</div>}
     </div>
   );
 }
 
+/** ✅✅ 여기 에러 수정 핵심: 인자 중복 없게! */
 function StatusChip({ text, isPaid, isPartial, small = false }) {
   const bg = isPaid ? "#dcfce7" : isPartial ? "#e0e7ff" : "#ffedd5";
   const border = isPaid ? "#22c55e" : isPartial ? "#6366f1" : "#fb923c";
@@ -465,7 +480,6 @@ function StatusChip({ text, isPaid, isPartial, small = false }) {
     </span>
   );
 }
-
 
 /* ───────────────────────────── 유틸 ───────────────────────────── */
 
