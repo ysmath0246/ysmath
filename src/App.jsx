@@ -23,7 +23,6 @@ import NoticesPage from "./pages/NoticesPage.jsx";
 import MyClassPage from "./pages/MyClassPage.jsx";
 import EnrollPage from "./pages/EnrollPage.jsx";
 
-
 // ✅ 월제 결제 메인 페이지 (새로 추가)
 import MonthlyPaymentPage from "./pages/MonthlyPaymentPage.jsx";
 
@@ -50,7 +49,8 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: 16 }}>
-          문제가 발생했어요. 새로고침(F5)하거나, 우측 상단에서 ‘로그아웃’ 후 다시 로그인해 주세요.
+          문제가 발생했어요. 새로고침(F5)하거나, 우측 상단에서 ‘로그아웃’ 후 다시
+          로그인해 주세요.
         </div>
       );
     }
@@ -68,7 +68,8 @@ const toJSDate = (v) => {
 
 export default function App() {
   return (
-    <HashRouter>
+    // ✅✅ 핵심1) GitHub Pages에서 /ysmath/ 아래로 깔려있으니 basename 지정!
+    <HashRouter basename="/ysmath">
       <ErrorBoundary>
         <AppContent />
       </ErrorBoundary>
@@ -169,7 +170,7 @@ function AppContent() {
           <div className="nav-links" style={{ justifyContent: "center" }}>
             {[
               "/attendance",
-              "/payment",     // ✅ 월제 결제가 여기로
+              "/payment", // ✅ 월제 결제가 여기로
               "/notices",
               "/myclass",
               "/enroll",
@@ -211,7 +212,8 @@ function AppContent() {
                             padding: "2px 6px",
                             fontSize: "10px",
                             fontWeight: "bold",
-                            fontFamily: "'Segoe UI','Apple SD Gothic Neo',sans-serif",
+                            fontFamily:
+                              "'Segoe UI','Apple SD Gothic Neo',sans-serif",
                           }}
                         >
                           🔥 새글
@@ -223,8 +225,6 @@ function AppContent() {
                 }[path]}
               </NavLink>
             ))}
-
-            {/* ✅ 아이 변경 버튼 제거 (각 페이지/선택 페이지에서만 하도록) */}
 
             {/* ✅ 부모 비밀번호 변경 */}
             <button
@@ -280,7 +280,11 @@ function AppContent() {
         <Route
           path="change-password"
           element={
-            !isParentLoggedIn ? <Navigate to="login" replace /> : <ChangePasswordPage />
+            !isParentLoggedIn ? (
+              <Navigate to="login" replace />
+            ) : (
+              <ChangePasswordPage />
+            )
           }
         />
         <Route
@@ -296,8 +300,6 @@ function AppContent() {
           }
         />
 
-        
-
         {/* ③ 주요 페이지 (학생 선택까지 끝난 상태에서만) */}
         <Route path="attendance" element={guard(<AttendancePage />)} />
 
@@ -311,7 +313,7 @@ function AppContent() {
         <Route path="myclass" element={guard(<MyClassPage />)} />
         <Route path="enroll" element={guard(<EnrollPage />)} />
 
-        {/* ④ 기타 경로는 index로 */}
+        {/* ✅✅ 핵심2) 어떤 주소로 와도 “해시 루트”로 보내기 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
