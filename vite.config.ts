@@ -16,7 +16,9 @@ export default defineConfig({
         name: "연상수학 학부모 페이지",
         short_name: "연상수학",
         description: "출석/공지/수업현황/결제 확인",
-        start_url: "/ysmath/#/notices", // HashRouter면 OK
+
+        // HashRouter 기준
+        start_url: "/ysmath/#/notices",
         scope: "/ysmath/",
         display: "standalone",
         background_color: "#ffffff",
@@ -33,16 +35,16 @@ export default defineConfig({
         ],
       },
 
-      // HashRouter면 사실 navigateFallback 거의 필요 없지만,
-      // 있어도 무해한 편이라 유지 OK
       workbox: {
         navigateFallback: "/ysmath/index.html",
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
       },
     }),
   ],
 
+  // ✅ GitHub Pages가 main/docs를 보고 있으니 outDir도 docs로!
   build: {
-    outDir: "docs",        // ✅ Pages 설정(main /docs)과 통일
+    outDir: "docs",
     emptyOutDir: true,
   },
 });
