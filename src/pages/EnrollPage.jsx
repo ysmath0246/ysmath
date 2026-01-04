@@ -50,7 +50,7 @@ export default function EnrollPage() {
   // 선택 상태 (초/중등 신청 선택)
   const [selectedApplied, setSelectedApplied] = useState([]); // [{day,time,status?}]
 
-  // 인원수 집계 (초/중등 enrollments 컬렉션 기준)
+  // 인원수 집계 (초/중등 enrollments 컬렉션 기준) - 화면에는 노출 X
   const [countsApplied, setCountsApplied] = useState({}); // key: `${day}|${time}`
   const [countsReserve, setCountsReserve] = useState({}); // reserve
 
@@ -76,7 +76,7 @@ export default function EnrollPage() {
   const [clinicCountsRegular, setClinicCountsRegular] = useState({}); // key: `${day}|${blockId}`
   const [savedClinic, setSavedClinic] = useState(null); // {regular, ...}
 
-  // ✅ 집중연산반(화수목) 3/4/5시 (정원 8)
+  // ✅ 집중연산반(화수목) 3/4/5시 (정원 8) - 화면에는 숫자 노출 X
   const OP_DAY = "화수목";
   const OP_TIMES = ["3시", "4시", "5시"];
   const OP_LIMIT = 8;
@@ -85,7 +85,10 @@ export default function EnrollPage() {
   const [savedOperation, setSavedOperation] = useState(null);
   const [opCounts, setOpCounts] = useState({}); // key: time -> count
 
-  // ✅ 집중학습반(26년1월) - 화/수/목 x 3/4/5시 = 9칸, 2개 또는 3개 선택, 같은 요일 중복 선택 불가, 정원 8
+  // ✅ 집중학습반(26년1월) - 화/수/목 x 3/4/5시 = 9칸
+  // ✅ 선택: 1개/2개/3개 모두 가능
+  // ✅ 같은 요일 중복 선택 불가(같은 요일 클릭하면 교체)
+  // ✅ 정원 8 - 화면에는 숫자 노출 X
   const INT_DAYS = ["화", "수", "목"];
   const INT_TIMES = ["3시", "4시", "5시"];
   const INT_LIMIT = 8;
@@ -95,7 +98,7 @@ export default function EnrollPage() {
   const [intensiveCounts, setIntensiveCounts] = useState({}); // key: `${day}|${time}` -> count
   const [intensiveUpdatedAt, setIntensiveUpdatedAt] = useState(null);
 
-  // ✅ 고등부(26년3월) - 요일만 선택(최대 4개), 정원 6(요일별)
+  // ✅ 고등부(26년3월) - 요일만 선택(최대 4개), 정원 6(요일별) - 화면 숫자 노출 X
   const HIGH_DAYS = ["월", "화", "목", "금"];
   const HIGH_LIMIT = 6;
 
@@ -104,10 +107,10 @@ export default function EnrollPage() {
   const [highCounts, setHighCounts] = useState({}); // key: day -> count
   const [highUpdatedAt, setHighUpdatedAt] = useState(null);
 
-  // ✅ 심화경시반(26년3월) - 신청/신청취소만
+  // ✅ 심화경시반(26년3월) - 신청/신청취소만 (전체 인원수 화면 노출 X)
   const [advApplied, setAdvApplied] = useState(false);
   const [savedAdvApplied, setSavedAdvApplied] = useState(false);
-  const [advCounts, setAdvCounts] = useState(0);
+  const [advCounts, setAdvCounts] = useState(0); // 내부용(노출 X)
   const [advUpdatedAt, setAdvUpdatedAt] = useState(null);
 
   // 시간표 (초/중등)
@@ -148,14 +151,14 @@ export default function EnrollPage() {
   const existsIn = (arr, d, t) => arr.some((s) => s.day === d && s.time === t);
   const clinicKey = (day, blockId) => `${day}|${blockId}`;
 
-  // ✅ 정원 6 문구 (초/중등)
+  // ✅ 정원 6 문구 (초/중등) - 숫자 노출 없이 상태만
   const appliedLabel6 = (appliedCnt) => {
     if (appliedCnt >= 6) return { text: "마감", tone: "danger" };
     if (appliedCnt >= 4) return { text: "임박", tone: "warn" };
     return { text: "접수중", tone: "ok" };
   };
 
-  // ✅ 정원 8 문구 (집중학습/집중연산)
+  // ✅ 정원 8 문구 (집중학습/집중연산) - 숫자 노출 없이 상태만
   const appliedLabel8 = (cnt) => {
     if (cnt >= 8) return { text: "마감", tone: "danger" };
     if (cnt >= 4) return { text: "임박", tone: "warn" };
@@ -439,7 +442,7 @@ export default function EnrollPage() {
     return () => unsub();
   }, [studentId]);
 
-  // ====== 중등부 클리닉 전체 인원 집계 ======
+  // ====== 중등부 클리닉 전체 인원 집계 (화면 노출 X) ======
   useEffect(() => {
     const qAll = collection(db, "middle_clinic_days");
     const unsub = onSnapshot(qAll, (snap) => {
@@ -494,7 +497,7 @@ export default function EnrollPage() {
     return () => unsub();
   }, [studentId]);
 
-  // ====== ✅ 집중연산반: 전체 인원 집계 ======
+  // ====== ✅ 집중연산반: 전체 인원 집계 (화면 노출 X) ======
   useEffect(() => {
     const ref = collection(db, "operation_enrollments");
     const unsub = onSnapshot(ref, (snap) => {
@@ -557,7 +560,9 @@ export default function EnrollPage() {
     // 같은 요일 중복 선택 불가 → 해당 요일 이미 선택돼 있으면 "교체"
     const already = existsIn(intensiveSelected, day, time);
     if (already) {
-      setIntensiveSelected(intensiveSelected.filter((s) => !(s.day === day && s.time === time)));
+      setIntensiveSelected(
+        intensiveSelected.filter((s) => !(s.day === day && s.time === time))
+      );
       return;
     }
 
@@ -583,12 +588,13 @@ export default function EnrollPage() {
       return;
     }
 
-    if (intensiveSelected.length !== 2 && intensiveSelected.length !== 3) {
-      alert("집중학습반은 9개 중 2개 또는 3개를 선택해 주세요.");
+    // ✅ 1개/2개/3개 모두 가능 (0개만 금지)
+    if (intensiveSelected.length < 1 || intensiveSelected.length > 3) {
+      alert("집중학습반은 1개 ~ 3개를 선택해 주세요.");
       return;
     }
 
-    // 정원 체크 (8명)
+    // 정원 체크 (8명) - 화면 노출 X
     for (const { day, time } of intensiveSelected) {
       const k = keyOf(day, time);
       const current = intensiveCounts[k] || 0;
@@ -618,7 +624,10 @@ export default function EnrollPage() {
     );
 
     // 2) 카운트용: 기존 내 기록 삭제 후 재기록
-    const qMe = query(collection(db, "intensive_enrollments"), where("studentId", "==", studentId));
+    const qMe = query(
+      collection(db, "intensive_enrollments"),
+      where("studentId", "==", studentId)
+    );
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
 
@@ -744,7 +753,7 @@ export default function EnrollPage() {
   };
 
   // =========================
-  // ✅ 심화경시반 구독/집계
+  // ✅ 심화경시반 구독/집계 (전체 인원수는 화면 미노출)
   // =========================
   useEffect(() => {
     if (!studentId) {
@@ -816,63 +825,53 @@ export default function EnrollPage() {
     alert(nextApplied ? "심화경시반 신청이 저장되었습니다." : "심화경시반 신청이 취소되었습니다.");
   };
 
-  // ====== 초등부/중등부 선택 로직 ======
+  // ====== ✅ 초등부/중등부 선택 로직 (요청사항 반영) ======
+  // ✅ 초등부: 기존 "월/수, 화/목, 수/금" 제한 제거
+  // ✅ 초등부: 1개 또는 2개 선택 가능
+  // ✅ 초등부: 같은 요일 중복 선택 불가(같은 요일 클릭하면 교체)
   const toggleElementarySlot = (day, time) => {
-    const validPairs = [
-      ["월", "수"],
-      ["화", "목"],
-      ["수", "금"],
-    ];
-
+    // 이미 같은 슬롯이면 해제
     if (existsIn(selectedApplied, day, time)) {
       setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
       return;
     }
 
-    if (selectedApplied.length === 0) {
-      setSelectedApplied([{ day, time }]);
+    // 같은 요일이 이미 있으면 교체
+    const idxSameDay = selectedApplied.findIndex((s) => s.day === day);
+    if (idxSameDay !== -1) {
+      const next = [...selectedApplied];
+      next[idxSameDay] = { day, time };
+      setSelectedApplied(next);
       return;
     }
 
-    if (selectedApplied.length === 1) {
-      const first = selectedApplied[0];
-
-      if (first.day === day) {
-        setSelectedApplied([{ day, time }]);
-        return;
-      }
-
-      const sortedDays = [first.day, day].sort().join("");
-      const isValid = validPairs.some((pair) => pair.slice().sort().join("") === sortedDays);
-
-      if (!isValid) {
-        alert("초등부는 '월/수', '화/목', '수/금' 조합만 선택할 수 있습니다.");
-        return;
-      }
-
-      setSelectedApplied([first, { day, time }]);
-      return;
-    }
-
+    // 최대 2개
     if (selectedApplied.length >= 2) {
-      const idxSameDay = selectedApplied.findIndex((s) => s.day === day);
-      if (idxSameDay !== -1) {
-        const next = [...selectedApplied];
-        next[idxSameDay] = { day, time };
-        setSelectedApplied(next);
-        return;
-      }
-
-      alert("초등부는 한 번에 '월/수', '화/목', '수/금' 한 조합만 선택할 수 있습니다.");
+      alert("초등부는 신청 시간대를 최대 2개까지만 선택할 수 있습니다.");
       return;
     }
+
+    setSelectedApplied([...selectedApplied, { day, time }]);
   };
 
+  // ✅ 중등부: 최대 2개
+  // ✅ 같은 요일 중복 선택 불가(같은 요일 클릭하면 교체)
   const toggleMiddleSlot = (day, time) => {
+    // 이미 같은 슬롯이면 해제
     if (existsIn(selectedApplied, day, time)) {
       setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
       return;
     }
+
+    // 같은 요일이 이미 있으면 교체
+    const idxSameDay = selectedApplied.findIndex((s) => s.day === day);
+    if (idxSameDay !== -1) {
+      const next = [...selectedApplied];
+      next[idxSameDay] = { day, time };
+      setSelectedApplied(next);
+      return;
+    }
+
     if (selectedApplied.length >= 2) {
       alert("중등부는 신청 시간대를 최대 2개까지만 선택할 수 있습니다.");
       return;
@@ -1010,89 +1009,50 @@ export default function EnrollPage() {
       return;
     }
 
+    // ✅ 초등/중등: 1개 또는 2개 선택 가능
+    if (selectedApplied.length > 2) {
+      alert("한 번에 최대 2개까지만 선택할 수 있습니다.");
+      return;
+    }
+
     let appliedForSave = [...selectedApplied];
     let hasError = false;
     let errorMsg = "";
 
-    // 초등부
-    if (group === "elementary") {
-      const selectedDays = selectedApplied.map((s) => s.day);
-      if (selectedDays.length !== 2) {
-        alert("초등부는 요일 2개를 선택해 주세요. (월/수, 화/목, 수/금)");
-        return;
-      }
+    // 초등부 / 중등부 동일하게 정원/예비 처리
+    const nextApplied = [];
+    selectedApplied.forEach(({ day, time }) => {
+      const k = keyOf(day, time);
+      const currentApplied = countsApplied[k] || 0;
+      const currentReserve = countsReserve[k] || 0;
 
-      const nextApplied = [];
-      selectedApplied.forEach(({ day, time }) => {
-        const k = keyOf(day, time);
-        const currentApplied = countsApplied[k] || 0;
-        const currentReserve = countsReserve[k] || 0;
+      let status;
 
-        let status;
-
-        if (enrollConfig.reserveOnly) {
-          if (currentReserve >= 10) {
-            hasError = true;
-            errorMsg += `${day} ${time} 시간은 예비 신청이 모두 마감되었습니다.\n`;
-            return;
-          }
-          status = "reserve";
-        } else {
-          if (currentApplied < 6) status = "applied";
-          else if (currentReserve < 10) status = "reserve";
-          else {
-            hasError = true;
-            errorMsg += `${day} ${time} 시간은 신청 및 예비가 모두 마감되었습니다.\n`;
-            return;
-          }
+      if (enrollConfig.reserveOnly) {
+        if (currentReserve >= 10) {
+          hasError = true;
+          errorMsg += `${day} ${time} 시간은 예비 신청이 모두 마감되었습니다.\n`;
+          return;
         }
-
-        nextApplied.push({ day, time, status });
-      });
-
-      if (hasError) {
-        alert(errorMsg || "정원이 가득 찬 시간대가 있습니다. 다시 선택해 주세요.");
-        return;
-      }
-      appliedForSave = nextApplied;
-    }
-
-    // 중등부
-    if (group === "middle") {
-      const nextApplied = [];
-      selectedApplied.forEach(({ day, time }) => {
-        const k = keyOf(day, time);
-        const currentApplied = countsApplied[k] || 0;
-        const currentReserve = countsReserve[k] || 0;
-
-        let status;
-
-        if (enrollConfig.reserveOnly) {
-          if (currentReserve >= 10) {
-            hasError = true;
-            errorMsg += `${day} ${time} 시간은 예비 신청이 모두 마감되었습니다.\n`;
-            return;
-          }
-          status = "reserve";
-        } else {
-          if (currentApplied < 6) status = "applied";
-          else if (currentReserve < 10) status = "reserve";
-          else {
-            hasError = true;
-            errorMsg += `${day} ${time} 시간은 신청 및 예비가 모두 마감되었습니다.\n`;
-            return;
-          }
+        status = "reserve";
+      } else {
+        if (currentApplied < 6) status = "applied";
+        else if (currentReserve < 10) status = "reserve";
+        else {
+          hasError = true;
+          errorMsg += `${day} ${time} 시간은 신청 및 예비가 모두 마감되었습니다.\n`;
+          return;
         }
-
-        nextApplied.push({ day, time, status });
-      });
-
-      if (hasError) {
-        alert(errorMsg || "정원이 가득 찬 시간대가 있습니다. 다시 선택해 주세요.");
-        return;
       }
-      appliedForSave = nextApplied;
+
+      nextApplied.push({ day, time, status });
+    });
+
+    if (hasError) {
+      alert(errorMsg || "정원이 가득 찬 시간대가 있습니다. 다시 선택해 주세요.");
+      return;
     }
+    appliedForSave = nextApplied;
 
     const batch = writeBatch(db);
 
@@ -1307,14 +1267,20 @@ export default function EnrollPage() {
       ========================= */}
       {group === "intensive" ? (
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
             <div>
               <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
                 집중학습반(26년1월)
               </div>
               <div style={{ fontSize: 12, color: "#6b7280" }}>
-                ✅ 9개 중 <b>2개 또는 3개</b> 선택 / 같은 요일 중복 불가 / 정원: 각 시간{" "}
-                <b>{INT_LIMIT}명</b>
+                ✅ 9개 중 <b>1개 ~ 3개</b> 선택 / 같은 요일 중복 불가
               </div>
             </div>
             {!isMobile && (
@@ -1336,7 +1302,9 @@ export default function EnrollPage() {
                       const label = appliedLabel8(cnt);
 
                       const isSel = existsIn(intensiveSelected, day, t);
-                      const full = cnt >= INT_LIMIT && !savedIntensive.some((s) => s.day === day && s.time === t);
+                      const full =
+                        cnt >= INT_LIMIT &&
+                        !savedIntensive.some((s) => s.day === day && s.time === t);
 
                       return (
                         <button
@@ -1348,13 +1316,19 @@ export default function EnrollPage() {
                           disabled={full}
                           style={btnChip(isSel, full)}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
                             <div style={{ fontWeight: 900 }}>{t}</div>
                             <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
                           </div>
                           <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
-                            {cnt}/{INT_LIMIT}
-                            {isSel ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                            {isSel ? <span style={{ color: "#2563eb" }}>· 선택됨</span> : <span> </span>}
                           </div>
                         </button>
                       );
@@ -1378,10 +1352,25 @@ export default function EnrollPage() {
               >
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
-                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderBottom: "1px solid #e5e7eb",
+                        fontWeight: 900,
+                        width: 90,
+                      }}
+                    >
                       요일
                     </th>
-                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderBottom: "1px solid #e5e7eb",
+                        fontWeight: 900,
+                      }}
+                    >
                       시간 (상태)
                     </th>
                   </tr>
@@ -1389,7 +1378,14 @@ export default function EnrollPage() {
                 <tbody>
                   {INT_DAYS.map((day) => (
                     <tr key={day}>
-                      <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>
+                      <td
+                        style={{
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #f1f5f9",
+                          fontWeight: 900,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {day}
                       </td>
                       <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
@@ -1400,7 +1396,9 @@ export default function EnrollPage() {
                             const label = appliedLabel8(cnt);
 
                             const isSel = existsIn(intensiveSelected, day, t);
-                            const full = cnt >= INT_LIMIT && !savedIntensive.some((s) => s.day === day && s.time === t);
+                            const full =
+                              cnt >= INT_LIMIT &&
+                              !savedIntensive.some((s) => s.day === day && s.time === t);
 
                             return (
                               <button
@@ -1412,12 +1410,26 @@ export default function EnrollPage() {
                                 disabled={full}
                                 style={{ ...btnChip(isSel, full), minWidth: 190 }}
                               >
-                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: 8,
+                                    alignItems: "center",
+                                  }}
+                                >
                                   <div style={{ fontWeight: 900 }}>{t}</div>
                                   <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
                                 </div>
                                 {isSel && (
-                                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 900, color: "#2563eb" }}>
+                                  <div
+                                    style={{
+                                      marginTop: 6,
+                                      fontSize: 11,
+                                      fontWeight: 900,
+                                      color: "#2563eb",
+                                    }}
+                                  >
                                     • 신청선택됨
                                   </div>
                                 )}
@@ -1433,7 +1445,16 @@ export default function EnrollPage() {
             </div>
           )}
 
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              gap: 10,
+              alignItems: isMobile ? "stretch" : "center",
+              flexWrap: "wrap",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
             <div style={{ fontWeight: 900 }}>
               신청 선택:{" "}
               {intensiveSelected.length ? (
@@ -1480,10 +1501,16 @@ export default function EnrollPage() {
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
           <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>고등부(26년3월)</div>
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-            월/화/목/금 중 선택 (최대 4개) / 요일별 정원: {HIGH_LIMIT}명
+            월/화/목/금 중 선택 (최대 4개)
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, minmax(160px, 1fr))", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, minmax(160px, 1fr))",
+              gap: 10,
+            }}
+          >
             {HIGH_DAYS.map((day) => {
               const cnt = highCounts[day] || 0;
               const label = appliedLabel6High(cnt);
@@ -1501,20 +1528,35 @@ export default function EnrollPage() {
                   disabled={full}
                   style={btnChip(active, full)}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
                     <div style={{ fontWeight: 900 }}>{day}요일</div>
                     <span style={tinyBadge(label.text, label.tone)}>{label.text}</span>
                   </div>
                   <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
-                    {cnt}/{HIGH_LIMIT}
-                    {active ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                    {active ? <span style={{ color: "#2563eb" }}>· 선택됨</span> : <span> </span>}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              gap: 10,
+              alignItems: isMobile ? "stretch" : "center",
+              flexWrap: "wrap",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
             <div style={{ fontWeight: 900 }}>
               선택:{" "}
               {highSelectedDays.length ? (
@@ -1561,7 +1603,7 @@ export default function EnrollPage() {
             중등부 클리닉(정기) 신청
           </div>
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-            요일 + A/B반 선택 후 저장 (정원: 각 요일·반 {CLINIC_REGULAR_LIMIT}명)
+            요일 + A/B반 선택 후 저장
           </div>
 
           <div style={{ marginBottom: 10 }}>
@@ -1599,8 +1641,6 @@ export default function EnrollPage() {
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
               {CLINIC_BLOCKS.map((b) => {
                 const active = clinicRegular?.blockId === b.id;
-                const currentKey = clinicRegular?.day ? clinicKey(clinicRegular.day, b.id) : null;
-                const currentCount = currentKey ? clinicCountsRegular[currentKey] || 0 : 0;
                 const full = clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
 
                 return (
@@ -1618,12 +1658,11 @@ export default function EnrollPage() {
                       fontWeight: 900,
                       textAlign: "left",
                     }}
-                    title={currentKey ? `현재 ${currentCount}명 / 정원 ${CLINIC_REGULAR_LIMIT}명` : undefined}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                       <span>{b.label}</span>
-                      <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
-                        {currentCount}/{CLINIC_REGULAR_LIMIT}
+                      <span style={{ fontSize: 12, fontWeight: 900, color: full ? "#b91c1c" : "#6b7280" }}>
+                        {full ? "마감" : "선택"}
                       </span>
                     </div>
                   </button>
@@ -1648,7 +1687,15 @@ export default function EnrollPage() {
             클리닉 저장
           </button>
 
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
+          <div
+            style={{
+              marginTop: 14,
+              padding: 12,
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+              background: "#f9fafb",
+            }}
+          >
             <div style={{ fontWeight: 900, marginBottom: 6 }}>저장된 클리닉</div>
             {savedClinic?.regular ? (
               <div style={{ color: "#111827", fontWeight: 900 }}>
@@ -1674,7 +1721,15 @@ export default function EnrollPage() {
             신청 / 신청취소 버튼만 저장됩니다.
           </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "stretch", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "stretch",
+              flexWrap: "wrap",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
             <button
               onClick={() => {
                 setAdvApplied(true);
@@ -1731,15 +1786,7 @@ export default function EnrollPage() {
             </span>
           </div>
 
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>전체 신청 인원</div>
-            <div style={{ fontSize: 22, fontWeight: 900 }}>{advCounts}명</div>
-            {advUpdatedAt && (
-              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900, marginTop: 6 }}>
-                업데이트: {advUpdatedAt.toLocaleString()}
-              </div>
-            )}
-          </div>
+          {/* ✅ 전체 신청 인원 블록 제거 (요청사항) */}
         </div>
       ) : null}
 
@@ -1794,9 +1841,12 @@ export default function EnrollPage() {
                             </div>
 
                             <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280", fontWeight: 900 }}>
-                              {appliedCnt}/6
-                              {enrollConfig.reserveOnly ? <span style={{ color: "#92400e" }}> · 예비만</span> : ""}
-                              {isAppliedSel ? <span style={{ color: "#2563eb" }}> · 선택</span> : ""}
+                              {enrollConfig.reserveOnly ? <span style={{ color: "#92400e" }}>· 예비만</span> : null}
+                              {isAppliedSel ? (
+                                <span style={{ color: "#2563eb" }}>
+                                  {enrollConfig.reserveOnly ? " · " : "· "}선택됨
+                                </span>
+                              ) : null}
                             </div>
                           </button>
                         );
@@ -1820,10 +1870,25 @@ export default function EnrollPage() {
               >
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
-                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900, width: 90 }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderBottom: "1px solid #e5e7eb",
+                        fontWeight: 900,
+                        width: 90,
+                      }}
+                    >
                       요일
                     </th>
-                    <th style={{ textAlign: "left", padding: "10px 12px", borderBottom: "1px solid #e5e7eb", fontWeight: 900 }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderBottom: "1px solid #e5e7eb",
+                        fontWeight: 900,
+                      }}
+                    >
                       시간 (상태)
                     </th>
                   </tr>
@@ -1832,7 +1897,14 @@ export default function EnrollPage() {
                   {currentTable &&
                     Object.entries(currentTable).map(([day, times]) => (
                       <tr key={day}>
-                        <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 900, whiteSpace: "nowrap" }}>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: "1px solid #f1f5f9",
+                            fontWeight: 900,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           {day}
                         </td>
                         <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
@@ -1908,7 +1980,16 @@ export default function EnrollPage() {
           )}
 
           {/* 저장 영역 */}
-          <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: isMobile ? "stretch" : "center", flexWrap: "wrap", flexDirection: isMobile ? "column" : "row" }}>
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              gap: 10,
+              alignItems: isMobile ? "stretch" : "center",
+              flexWrap: "wrap",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
             <div style={{ color: "#374151", fontWeight: 900 }}>
               {cursor ? (
                 <span>
