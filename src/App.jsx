@@ -29,7 +29,6 @@ import MonthlyPaymentPage from "./pages/MonthlyPaymentPage.jsx";
 // ✅ 새로 추가되는 페이지 2개
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
 import SelectChildPage from "./pages/SelectChildPage.jsx";
-import AdminAttendanceBookPage from "./pages/AdminAttendanceBookPage.jsx";
 
 import React from "react";
 import "./App.css";
