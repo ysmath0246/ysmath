@@ -10,6 +10,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+
+      // ✅ public/ 안에 있는 파일들만 넣어주면 됨
       includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png"],
 
       manifest: {
@@ -17,12 +19,13 @@ export default defineConfig({
         short_name: "연상수학",
         description: "출석/공지/수업현황/결제 확인",
 
-        // HashRouter 기준
-        start_url: "/ysmath/#/notices",
+        // ✅ HashRouter라도 start_url은 루트로 (설치판정 안정)
+        start_url: "/ysmath/",
         scope: "/ysmath/",
         display: "standalone",
         background_color: "#ffffff",
         theme_color: "#2563eb",
+
         icons: [
           { src: "/ysmath/pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "/ysmath/pwa-512.png", sizes: "512x512", type: "image/png" },
@@ -35,14 +38,12 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
-        navigateFallback: "/ysmath/index.html",
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webmanifest}"],
-      },
+      // ✅ HashRouter는 navigateFallback 굳이 안 넣는 게 더 안정적인 경우 많음
+      // workbox 기본 설정으로 둠
     }),
   ],
 
-  // ✅ GitHub Pages가 main/docs를 보고 있으니 outDir도 docs로!
+  // ✅ GitHub Pages가 main/docs 보는 경우
   build: {
     outDir: "docs",
     emptyOutDir: true,
