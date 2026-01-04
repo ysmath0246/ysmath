@@ -39,7 +39,9 @@ export default function EnrollPage() {
   // ✅ 부모/아이
   const parentPhone = localStorage.getItem("parentPhone") || "";
   const [childList, setChildList] = useState([]); // [{id,name}]
-  const [studentId, setStudentId] = useState(localStorage.getItem("studentId") || "");
+  const [studentId, setStudentId] = useState(
+    localStorage.getItem("studentId") || ""
+  );
   const [studentName, setStudentName] = useState(
     (localStorage.getItem("studentName") || "").trim()
   );
@@ -147,6 +149,19 @@ export default function EnrollPage() {
   const existsIn = (arr, d, t) => arr.some((s) => s.day === d && s.time === t);
   const clinicKey = (day, blockId) => `${day}|${blockId}`;
 
+  // ✅ 모바일에서 30분 표기 때문에 세로로 커지는 문제 해결: 표시용 포맷
+  const displayTime = (t) => {
+    if (!t) return "";
+    // "3시30분" -> "3:30", "2시30분" -> "2:30"
+    const m = String(t).match(/^(\d+)시30분$/);
+    if (m) return `${m[1]}:30`;
+    // "6시30분" -> "6:30"
+    const m2 = String(t).match(/^(\d+)시30분$/);
+    if (m2) return `${m2[1]}:30`;
+    // "2시" -> "2시"
+    return String(t);
+  };
+
   // ✅ 정원 6 문구 (초/중등) - 숫자 노출 없이 상태만
   const appliedLabel6 = (appliedCnt) => {
     if (appliedCnt >= 6) return { text: "마감", tone: "danger" };
@@ -175,7 +190,8 @@ export default function EnrollPage() {
     return "#22c55e";
   };
 
-  const StatusDot = ({ text, tone }) => (
+  // ✅ 범례용 (텍스트+점)
+  const StatusLegend = ({ text, tone }) => (
     <span
       style={{
         display: "inline-flex",
@@ -194,11 +210,24 @@ export default function EnrollPage() {
           borderRadius: 999,
           background: toneColor(tone),
           display: "inline-block",
-          boxShadow: "0 0 0 2px rgba(0,0,0,0.02)",
         }}
       />
       {text}
     </span>
+  );
+
+  // ✅ 카드 안에서는 "글씨" 줄여서: 점만 표시 (폭/높이 절약)
+  const StatusDotMini = ({ tone }) => (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        background: toneColor(tone),
+        display: "inline-block",
+        flex: "0 0 auto",
+      }}
+    />
   );
 
   // ===== UI 스타일 =====
@@ -215,17 +244,17 @@ export default function EnrollPage() {
     boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   };
 
-  // ✅ 버튼(시간칩)
+  // ✅ 버튼(시간칩) - 모바일을 더 촘촘하게 (3개 한 줄용)
   const btnChip = (active, disabled = false) => ({
-    padding: isMobile ? "12px 12px" : "11px 12px",
-    borderRadius: 14,
+    padding: isMobile ? "10px 8px" : "11px 12px",
+    borderRadius: isMobile ? 12 : 14,
     border: `1px solid ${active ? "#2563eb" : "#e5e7eb"}`,
     background: active ? "#eef5ff" : "#fff",
     fontWeight: 900,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.55 : 1,
     textAlign: "left",
-    width: isMobile ? "100%" : "auto",
+    width: "100%",
     transition: "transform 0.06s ease",
   });
 
@@ -262,13 +291,6 @@ export default function EnrollPage() {
     whiteSpace: "nowrap",
     flex: "0 0 auto",
   });
-
-  const selectedHint = {
-    marginTop: 8,
-    fontSize: 11,
-    fontWeight: 900,
-    color: "#2563eb",
-  };
 
   // ====== 아이 목록 불러오기 ======
   useEffect(() => {
@@ -363,7 +385,9 @@ export default function EnrollPage() {
         const data = snap.data() || {};
         setEnrollConfig({
           isOpen:
-            data.isOpen !== undefined && data.isOpen !== null ? !!data.isOpen : true,
+            data.isOpen !== undefined && data.isOpen !== null
+              ? !!data.isOpen
+              : true,
           reserveOnly:
             data.reserveOnly !== undefined && data.reserveOnly !== null
               ? !!data.reserveOnly
@@ -836,7 +860,9 @@ export default function EnrollPage() {
   // ✅ 초등부: 최대 2개 / 같은 요일 중복 불가(같은 요일 클릭하면 교체)
   const toggleElementarySlot = (day, time) => {
     if (existsIn(selectedApplied, day, time)) {
-      setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
+      setSelectedApplied(
+        selectedApplied.filter((s) => !(s.day === day && s.time === time))
+      );
       return;
     }
 
@@ -859,7 +885,9 @@ export default function EnrollPage() {
   // ✅ 중등부: 최대 2개 / 같은 요일 중복 불가(같은 요일 클릭하면 교체)
   const toggleMiddleSlot = (day, time) => {
     if (existsIn(selectedApplied, day, time)) {
-      setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
+      setSelectedApplied(
+        selectedApplied.filter((s) => !(s.day === day && s.time === time))
+      );
       return;
     }
 
@@ -1120,14 +1148,18 @@ export default function EnrollPage() {
 
     if (elem.length) {
       const txt = elem
-        .map((s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`)
+        .map(
+          (s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
+        )
         .join(", ");
       lines.push(`🟩 초등부: ${txt}`);
     }
 
     if (mid.length) {
       const txt = mid
-        .map((s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`)
+        .map(
+          (s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
+        )
         .join(", ");
       lines.push(`🟨 중등부: ${txt}`);
     }
@@ -1149,28 +1181,43 @@ export default function EnrollPage() {
     return lines;
   })();
 
-  // ✅ 탭: middleClinic 제거
+  // ✅ 탭
   const tabs = ["intensive", "elementary", "middle", "high", "advanced"];
 
   // =========================
-  // ✅ 모바일용 렌더링 유틸
+  // ✅ 모바일용 렌더링 유틸 (여기 핵심 변경!)
   // =========================
   const MobileDayCard = ({ day, children }) => (
     <div
       style={{
         border: "1px solid #e5e7eb",
         borderRadius: 14,
-        padding: 12,
+        padding: 10, // ✅ 더 촘촘
         background: "#fff",
       }}
     >
-      <div style={{ fontWeight: 900, marginBottom: 10, fontSize: 14 }}>{day}</div>
+      <div
+        style={{
+          fontWeight: 900,
+          marginBottom: 8,
+          fontSize: 13, // ✅ 조금 작게
+        }}
+      >
+        {day}
+      </div>
       {children}
     </div>
   );
 
+  // ✅ 모바일 그리드: 3개 한 줄!
   const MobileGrid = ({ children }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)", // ✅ 2 -> 3
+        gap: 8, // ✅ 10 -> 8
+      }}
+    >
       {children}
     </div>
   );
@@ -1181,6 +1228,31 @@ export default function EnrollPage() {
     if (enrollConfig.reserveOnly) return { text: "예비 접수(초/중등)", tone: "warn" };
     return { text: "접수중(초/중등)", tone: "ok" };
   })();
+
+  // ✅ 공통: 모바일 카드 안 내용(시간 + 점만)으로 슬림하게
+  const MobileChipInner = ({ timeText, tone }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 900,
+          fontSize: 15, // ✅ 18 -> 15
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+          letterSpacing: -0.2,
+        }}
+      >
+        {timeText}
+      </div>
+      <StatusDotMini tone={tone} />
+    </div>
+  );
 
   return (
     <div style={shell}>
@@ -1234,14 +1306,31 @@ export default function EnrollPage() {
           )}
         </div>
 
-        {/* ✅ 초/중등 상태: 점으로 깔끔하게 */}
+        {/* ✅ 초/중등 상태 + 범례(모바일 가독성↑ / 카드 안 글씨↓) */}
         <div
           style={{
             marginTop: 10,
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
           }}
         >
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              fontSize: 12,
+            }}
+          >
+            <StatusLegend text="접수중" tone="ok" />
+            <StatusLegend text="임박" tone="warn" />
+            <StatusLegend text="마감" tone="danger" />
+          </div>
+
           <div
             style={{
               border: "1px solid #e5e7eb",
@@ -1251,7 +1340,7 @@ export default function EnrollPage() {
               boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
             }}
           >
-            <StatusDot text={enrollTopStatus.text} tone={enrollTopStatus.tone} />
+            <StatusLegend text={enrollTopStatus.text} tone={enrollTopStatus.tone} />
           </div>
         </div>
       </div>
@@ -1321,20 +1410,7 @@ export default function EnrollPage() {
                           disabled={full}
                           style={btnChip(isSel, full)}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              gap: 10,
-                            }}
-                          >
-                            <div style={{ fontWeight: 900, fontSize: 18, lineHeight: 1 }}>
-                              {t}
-                            </div>
-                            <StatusDot text={label.text} tone={label.tone} />
-                          </div>
-                          {isSel ? <div style={selectedHint}>• 선택됨</div> : null}
+                          <MobileChipInner timeText={displayTime(t)} tone={label.tone} />
                         </button>
                       );
                     })}
@@ -1419,13 +1495,12 @@ export default function EnrollPage() {
                                     display: "flex",
                                     justifyContent: "space-between",
                                     gap: 10,
-                                    alignItems: "flex-start",
+                                    alignItems: "center",
                                   }}
                                 >
                                   <div style={{ fontWeight: 900, fontSize: 16 }}>{t}</div>
-                                  <StatusDot text={label.text} tone={label.tone} />
+                                  <StatusLegend text={label.text} tone={label.tone} />
                                 </div>
-                                {isSel ? <div style={selectedHint}>• 선택됨</div> : null}
                               </button>
                             );
                           })}
@@ -1521,18 +1596,17 @@ export default function EnrollPage() {
                   disabled={full}
                   style={btnChip(active, full)}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ fontWeight: 900, fontSize: 18 }}>{day}요일</div>
-                    <StatusDot text={label.text} tone={label.tone} />
-                  </div>
-                  {active ? <div style={selectedHint}>• 선택됨</div> : null}
+                  {isMobile ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ fontWeight: 900, fontSize: 15, whiteSpace: "nowrap" }}>{day}요일</div>
+                      <StatusDotMini tone={label.tone} />
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                      <div style={{ fontWeight: 900, fontSize: 18 }}>{day}요일</div>
+                      <StatusLegend text={label.text} tone={label.tone} />
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -1665,7 +1739,7 @@ export default function EnrollPage() {
       ) : null}
 
       {/* =========================
-          ✅ 초등/중등 (모바일: 카드+그리드)
+          ✅ 초등/중등 (모바일: 카드+그리드 3열 + 카드 안 글씨 최소화)
       ========================= */}
       {group === "elementary" || group === "middle" ? (
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
@@ -1703,21 +1777,7 @@ export default function EnrollPage() {
                             disabled={disabledCompletely}
                             style={btnChip(isSelected, disabledCompletely)}
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                                gap: 10,
-                              }}
-                            >
-                              <div style={{ fontWeight: 900, fontSize: 18, lineHeight: 1 }}>
-                                {t}
-                              </div>
-                              <StatusDot text={label.text} tone={label.tone} />
-                            </div>
-
-                            {isSelected ? <div style={selectedHint}>• 선택됨</div> : null}
+                            <MobileChipInner timeText={displayTime(t)} tone={label.tone} />
                           </button>
                         );
                       })}
@@ -1812,14 +1872,12 @@ export default function EnrollPage() {
                                       display: "flex",
                                       justifyContent: "space-between",
                                       gap: 10,
-                                      alignItems: "flex-start",
+                                      alignItems: "center",
                                     }}
                                   >
                                     <div style={{ fontSize: 16, fontWeight: 900 }}>{t}</div>
-                                    <StatusDot text={label.text} tone={label.tone} />
+                                    <StatusLegend text={label.text} tone={label.tone} />
                                   </div>
-
-                                  {isSelected ? <div style={selectedHint}>• 선택됨</div> : null}
                                 </button>
                               );
                             })}
@@ -1894,7 +1952,7 @@ export default function EnrollPage() {
                       fontSize: 13,
                     }}
                   >
-                    {day} {time} {status === "reserve" ? "(예비)" : ""}
+                    {day} {displayTime(time)} {status === "reserve" ? "(예비)" : ""}
                     <button
                       onClick={() => removeApplied(day, time)}
                       title="제거"
@@ -1926,13 +1984,37 @@ export default function EnrollPage() {
                 }}
               >
                 <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 6 }}>
-                  클리닉(추가 제공 · 선택)
-                </div>
+  클리닉(추가/선택형) 💰 추가금 없음
+</div>
 
-                {/* ✅ 짧고 배려처럼 */}
-                <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6, marginBottom: 12 }}>
-                  숙제/보완이 필요한 경우에만 제공되는 추가 관리 시간입니다. <b>시간 가능할 때만</b> 신청하시면 됩니다.
-                </div>
+<div
+  style={{
+    fontSize: 12,
+    color: "#6b7280",
+    lineHeight: 1.6,
+    marginBottom: 12,
+  }}
+>
+  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+    ✔ 숙제 완벽 → 집에서 숙제 대체 가능
+  </span>
+
+  <br />
+
+  <span style={{ color: "#e11d48", fontWeight: 700 }}>
+    ❗ 숙제 미흡 / 이해 부족 → 클리닉 등원 권장
+  </span>
+
+  <br />
+
+  <span style={{ color: "#2563eb", fontWeight: 600 }}>
+    목적 :
+  </span>{" "}
+  <b style={{ color: "#1f2937" }}>
+    미완성 숙제 정리 / 개념 누락 보완 / 시험 대비 안정화
+  </b>
+</div>
+
 
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
@@ -2002,13 +2084,7 @@ export default function EnrollPage() {
                             }}
                           >
                             <span>{b.label}</span>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 900,
-                                color: full ? "#ef4444" : "#6b7280",
-                              }}
-                            >
+                            <span style={{ fontSize: 12, fontWeight: 900, color: full ? "#ef4444" : "#6b7280" }}>
                               {full ? "마감" : "선택"}
                             </span>
                           </div>
@@ -2100,7 +2176,7 @@ export default function EnrollPage() {
                         const g = s.group === "elementary" ? "초등부" : "중등부";
                         const tag =
                           s.status === "reserve" || s?.label === "신청(예비)" ? " (예비)" : "";
-                        return `${g} ${s.day} ${s.time}${tag}`;
+                        return `${g} ${s.day} ${displayTime(s.time)}${tag}`;
                       })
                       .join(", ")
                   ) : (
