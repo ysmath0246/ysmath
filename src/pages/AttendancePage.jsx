@@ -608,6 +608,34 @@ export default function AttendancePage() {
 
                 const hasAttend = !!(myRecord?.time || myRecord?.departureTime);
 
+
+                  const hhmm = (t) => {
+    const s = (t || "").toString().trim();
+    if (!s) return "";
+    // "16:05:12" 같은 경우 대비 -> 앞 5글자만
+    return s.length >= 5 ? s.slice(0, 5) : s;
+  };
+
+  const timePill = (text, color) => (
+    <span
+      style={{
+        display: "inline-block",
+        fontSize: isMobile ? 11 : 12,
+        fontWeight: 900,
+        color,
+        background: `${color}14`, // 살짝 투명 배경
+        padding: "2px 8px",
+        borderRadius: 999,
+        lineHeight: 1.2,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </span>
+  );
+
+
+  
                 return (
                   <div
                     key={ymd}
@@ -667,22 +695,41 @@ export default function AttendancePage() {
                       )}
                     </div>
 
-                    {myRecord ? (
-                      <div style={{ fontSize: isMobile ? 11 : 12, color: "#111827", lineHeight: 1.45 }}>
-                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <span style={{ color: "#0284c7", fontWeight: 900 }}>입실</span>{" "}
-                          {myRecord.time || "-"}
-                        </div>
-                        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <span style={{ color: "#16a34a", fontWeight: 900 }}>하원</span>{" "}
-                          {myRecord.departureTime || "-"}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: isMobile ? 11 : 12, color: "#9ca3af" }}>
-                        기록 없음
-                      </div>
-                    )}
+                  {myRecord ? (
+  (() => {
+    const tIn = hhmm(myRecord.time);
+    const tOut = hhmm(myRecord.departureTime);
+
+    // 둘 다 없으면 "기록 없음"과 동일하게 처리
+    if (!tIn && !tOut) {
+      return (
+        <div style={{ fontSize: isMobile ? 11 : 12, color: "#9ca3af" }}>
+          기록 없음
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          alignItems: "flex-start",
+          marginTop: 2,
+        }}
+      >
+        {tIn ? timePill(tIn, "#0284c7") : null}
+        {tOut ? timePill(tOut, "#16a34a") : null}
+      </div>
+    );
+  })()
+) : (
+  <div style={{ fontSize: isMobile ? 11 : 12, color: "#9ca3af" }}>
+    기록 없음
+  </div>
+)}
+
                   </div>
                 );
               })}
