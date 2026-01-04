@@ -68,8 +68,8 @@ const toJSDate = (v) => {
 
 export default function App() {
   return (
-    // ✅✅ 핵심1) GitHub Pages에서 /ysmath/ 아래로 깔려있으니 basename 지정!
-    <HashRouter basename="/ysmath">
+    // ✅ HashRouter는 basename 쓰면 충돌남 → 제거!
+    <HashRouter>
       <ErrorBoundary>
         <AppContent />
       </ErrorBoundary>
@@ -128,7 +128,8 @@ function AppContent() {
         const data = doc.data();
         return (
           data.studentId === studentId &&
-          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >= cutoff
+          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >=
+            cutoff
         );
       });
 
@@ -136,7 +137,8 @@ function AppContent() {
         const data = doc.data();
         return (
           data.studentId === studentId &&
-          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >= cutoff
+          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >=
+            cutoff
         );
       });
 
@@ -192,37 +194,44 @@ function AppContent() {
                   whiteSpace: "nowrap",
                 })}
               >
-                {{
-                  "/attendance": "출석",
-                  "/payment": "결제", // ✅ 월제(메인)
-                  "/notices": "공지사항",
-                  "/myclass": (
-                    <>
-                      내아이수업현황
-                      {hasNewCommentOrBook && (
-                        <span
-                          className="pulse wiggle"
-                          style={{
-                            position: "absolute",
-                            top: -8,
-                            right: -12,
-                            backgroundColor: "red",
-                            color: "white",
-                            borderRadius: "12px",
-                            padding: "2px 6px",
-                            fontSize: "10px",
-                            fontWeight: "bold",
-                            fontFamily:
-                              "'Segoe UI','Apple SD Gothic Neo',sans-serif",
-                          }}
-                        >
-                          🔥 새글
-                        </span>
-                      )}
-                    </>
-                  ),
-                  "/enroll": "수강신청",
-                }[path]}
+                {(() => {
+                  const labelMap = {
+                    "/attendance": "출석",
+                    "/payment": "결제", // ✅ 월제(메인)
+                    "/notices": "공지사항",
+                    "/enroll": "수강신청",
+                  };
+
+                  if (path === "/myclass") {
+                    return (
+                      <>
+                        내아이수업현황
+                        {hasNewCommentOrBook && (
+                          <span
+                            className="pulse wiggle"
+                            style={{
+                              position: "absolute",
+                              top: -8,
+                              right: -12,
+                              backgroundColor: "red",
+                              color: "white",
+                              borderRadius: "12px",
+                              padding: "2px 6px",
+                              fontSize: "10px",
+                              fontWeight: "bold",
+                              fontFamily:
+                                "'Segoe UI','Apple SD Gothic Neo',sans-serif",
+                            }}
+                          >
+                            🔥 새글
+                          </span>
+                        )}
+                      </>
+                    );
+                  }
+
+                  return labelMap[path];
+                })()}
               </NavLink>
             ))}
 
