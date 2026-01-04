@@ -38,14 +38,11 @@ export default function EnrollPage() {
 
   // ✅ 부모/아이
   const parentPhone = localStorage.getItem("parentPhone") || "";
-  const [children, setChildren] = useState([]); // [{id,name}]
+  const [childList, setChildList] = useState([]); // [{id,name}]
   const [studentId, setStudentId] = useState(localStorage.getItem("studentId") || "");
   const [studentName, setStudentName] = useState(
     (localStorage.getItem("studentName") || "").trim()
   );
-
-  // 표에서 클릭한 현재 커서 슬롯
-  const [cursor, setCursor] = useState(null); // { day, time } | null
 
   // 선택 상태 (초/중등 신청 선택)
   const [selectedApplied, setSelectedApplied] = useState([]); // [{day,time,status?}]
@@ -219,7 +216,7 @@ export default function EnrollPage() {
     boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
   };
 
-  // ✅ 버튼(시간칩) - 깔끔 버전(점 상태 + 불필요 문구 제거)
+  // ✅ 버튼(시간칩)
   const btnChip = (active, disabled = false) => ({
     padding: isMobile ? "12px 12px" : "11px 12px",
     borderRadius: 14,
@@ -281,7 +278,7 @@ export default function EnrollPage() {
       try {
         const pSnap = await getDoc(doc(db, "parents", parentPhone));
         if (!pSnap.exists()) {
-          setChildren([]);
+          setChildList([]);
           return;
         }
         const ids = pSnap.data()?.children || [];
@@ -298,7 +295,7 @@ export default function EnrollPage() {
           }
         }
         items.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-        setChildren(items);
+        setChildList(items);
 
         if (!studentId && items.length) {
           const first = items[0];
@@ -308,8 +305,8 @@ export default function EnrollPage() {
           setStudentName(first.name);
         }
       } catch (e) {
-        console.error("children 로딩 오류:", e);
-        setChildren([]);
+        console.error("childList 로딩 오류:", e);
+        setChildList([]);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,7 +315,7 @@ export default function EnrollPage() {
   // ✅ 아이 변경 (상태 싹 초기화)
   const changeChild = async (newId) => {
     if (!newId) return;
-    const found = children.find((c) => c.id === newId);
+    const found = childList.find((c) => c.id === newId);
     let nm = (found?.name || "").trim();
 
     if (!nm) {
@@ -334,7 +331,6 @@ export default function EnrollPage() {
     setStudentId(newId);
     setStudentName(nm);
 
-    setCursor(null);
     setSelectedApplied([]);
     setSavedApplied([]);
     setLastUpdated(null);
@@ -746,7 +742,10 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    const qMe = query(collection(db, "high_enrollments"), where("studentId", "==", studentId));
+    const qMe = query(
+      collection(db, "high_enrollments"),
+      where("studentId", "==", studentId)
+    );
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
 
@@ -839,7 +838,7 @@ export default function EnrollPage() {
   };
 
   // ====== ✅ 초등부/중등부 선택 로직 ======
-  // ✅ 초등부: 1개 또는 2개 선택 가능 / 같은 요일 중복 불가(같은 요일 클릭하면 교체)
+  // ✅ 초등부: 최대 2개 / 같은 요일 중복 불가(같은 요일 클릭하면 교체)
   const toggleElementarySlot = (day, time) => {
     if (existsIn(selectedApplied, day, time)) {
       setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
@@ -978,7 +977,10 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    const qMe = query(collection(db, "operation_enrollments"), where("studentId", "==", studentId));
+    const qMe = query(
+      collection(db, "operation_enrollments"),
+      where("studentId", "==", studentId)
+    );
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
 
@@ -1074,7 +1076,10 @@ export default function EnrollPage() {
       updatedAt: serverTimestamp(),
     });
 
-    const qMe = query(collection(db, "enrollments"), where("studentName", "==", studentName.trim()));
+    const qMe = query(
+      collection(db, "enrollments"),
+      where("studentName", "==", studentName.trim())
+    );
     const prev = await getDocs(qMe);
     prev.forEach((snap) => batch.delete(snap.ref));
 
@@ -1204,7 +1209,7 @@ export default function EnrollPage() {
             </div>
           </div>
 
-          {children.length > 0 && (
+          {childList.length > 0 && (
             <div style={{ width: isMobile ? "100%" : "auto" }}>
               <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900, marginBottom: 6 }}>
                 아이 선택
@@ -1214,7 +1219,7 @@ export default function EnrollPage() {
                 onChange={(e) => changeChild(e.target.value)}
                 style={selectStyle}
               >
-                {children.map((c) => (
+                {childList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -1253,10 +1258,7 @@ export default function EnrollPage() {
           return (
             <button
               key={g}
-              onClick={() => {
-                setGroup(g);
-                setCursor(null);
-              }}
+              onClick={() => setGroup(g)}
               style={tabBtn(active)}
             >
               {labelByGroup[g]}
@@ -1341,7 +1343,7 @@ export default function EnrollPage() {
               ))}
             </div>
           ) : (
-            // ✅ PC: 기존 표 유지 (표 안에서도 점 표시)
+            // ✅ PC: 표
             <div style={{ marginTop: 14, overflowX: "auto" }}>
               <table
                 style={{
@@ -1628,7 +1630,13 @@ export default function EnrollPage() {
             <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
               반 선택
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: 8,
+              }}
+            >
               {CLINIC_BLOCKS.map((b) => {
                 const active = clinicRegular?.blockId === b.id;
                 const full = clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
@@ -1649,9 +1657,22 @@ export default function EnrollPage() {
                       textAlign: "left",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
                       <span>{b.label}</span>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: full ? "#ef4444" : "#6b7280" }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: full ? "#ef4444" : "#6b7280",
+                        }}
+                      >
                         {full ? "마감" : "선택"}
                       </span>
                     </div>
@@ -1779,7 +1800,7 @@ export default function EnrollPage() {
       ) : null}
 
       {/* =========================
-          ✅ 초등/중등 (모바일: 표 대신 카드+그리드)
+          ✅ 초등/중등 (모바일: 카드+그리드)
       ========================= */}
       {group === "elementary" || group === "middle" ? (
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
@@ -1795,8 +1816,7 @@ export default function EnrollPage() {
                         const appliedCnt = countsApplied[k] || 0;
                         const label = appliedLabel6(appliedCnt);
 
-                        const isCursor = cursor && cursor.day === day && cursor.time === t;
-                        const isAppliedSel = existsIn(selectedApplied, day, t);
+                        const isSelected = existsIn(selectedApplied, day, t);
 
                         const isAppliedFull = appliedCnt >= 6;
                         const isReserveFull = (countsReserve[k] || 0) >= 10;
@@ -1812,18 +1832,11 @@ export default function EnrollPage() {
                             key={`${day}-${t}`}
                             onClick={() => {
                               if (!enrollConfig.isOpen) return alert("현재 수강신청이 마감되었습니다.");
-                              setCursor({ day, time: t });
                               if (group === "elementary") toggleElementarySlot(day, t);
                               else toggleMiddleSlot(day, t);
                             }}
                             disabled={disabledCompletely}
-                            style={{
-                              ...btnChip(isAppliedSel || isCursor, disabledCompletely),
-                              border: `1px solid ${
-                                isAppliedSel || isCursor ? "#2563eb" : "#e5e7eb"
-                              }`,
-                              background: isAppliedSel ? "#eef5ff" : isCursor ? "#f3f4ff" : "#fff",
-                            }}
+                            style={btnChip(isSelected, disabledCompletely)}
                           >
                             <div
                               style={{
@@ -1839,7 +1852,7 @@ export default function EnrollPage() {
                               <StatusDot text={label.text} tone={label.tone} />
                             </div>
 
-                            {isAppliedSel ? <div style={selectedHint}>• 선택됨</div> : null}
+                            {isSelected ? <div style={selectedHint}>• 선택됨</div> : null}
                           </button>
                         );
                       })}
@@ -1848,7 +1861,7 @@ export default function EnrollPage() {
                 ))}
             </div>
           ) : (
-            // ✅ PC UI (기존 표 유지, 점 표시로 변경)
+            // ✅ PC UI (표)
             <div style={{ overflowX: "auto" }}>
               <table
                 style={{
@@ -1906,8 +1919,7 @@ export default function EnrollPage() {
                               const appliedCnt = countsApplied[k] || 0;
                               const label = appliedLabel6(appliedCnt);
 
-                              const isCursor = cursor && cursor.day === day && cursor.time === t;
-                              const isAppliedSel = existsIn(selectedApplied, day, t);
+                              const isSelected = existsIn(selectedApplied, day, t);
 
                               const isAppliedFull = appliedCnt >= 6;
                               const isReserveFull = (countsReserve[k] || 0) >= 10;
@@ -1924,23 +1936,11 @@ export default function EnrollPage() {
                                   onClick={() => {
                                     if (!enrollConfig.isOpen)
                                       return alert("현재 수강신청이 마감되었습니다.");
-                                    setCursor({ day, time: t });
                                     if (group === "elementary") toggleElementarySlot(day, t);
                                     else toggleMiddleSlot(day, t);
                                   }}
                                   disabled={disabledCompletely}
-                                  style={{
-                                    ...btnChip(isAppliedSel || isCursor, disabledCompletely),
-                                    minWidth: 180,
-                                    border: `1px solid ${
-                                      isAppliedSel || isCursor ? "#2563eb" : "#e5e7eb"
-                                    }`,
-                                    background: isAppliedSel
-                                      ? "#eef5ff"
-                                      : isCursor
-                                      ? "#f3f4ff"
-                                      : "#fff",
-                                  }}
+                                  style={{ ...btnChip(isSelected, disabledCompletely), minWidth: 180 }}
                                 >
                                   <div
                                     style={{
@@ -1954,7 +1954,7 @@ export default function EnrollPage() {
                                     <StatusDot text={label.text} tone={label.tone} />
                                   </div>
 
-                                  {isAppliedSel ? <div style={selectedHint}>• 선택됨</div> : null}
+                                  {isSelected ? <div style={selectedHint}>• 선택됨</div> : null}
                                 </button>
                               );
                             })}
@@ -1979,12 +1979,14 @@ export default function EnrollPage() {
             }}
           >
             <div style={{ color: "#374151", fontWeight: 900 }}>
-              {cursor ? (
+              선택:{" "}
+              {selectedApplied.length ? (
                 <span>
-                  선택 대상: <b>{cursor.day}</b> <b>{cursor.time}</b>
+                  {selectedApplied.map((s) => `${s.day} ${s.time}`).join(", ")}{" "}
+                  <span style={{ color: "#6b7280" }}>({selectedApplied.length}개)</span>
                 </span>
               ) : (
-                <span style={{ color: "#6b7280" }}>시간대를 선택하세요</span>
+                <span style={{ color: "#6b7280" }}>없음</span>
               )}
             </div>
 
