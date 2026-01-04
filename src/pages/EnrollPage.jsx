@@ -15,7 +15,7 @@ import {
 
 export default function EnrollPage() {
   // 탭:
-  // "intensive" | "elementary" | "middle" | "middleClinic" | "high" | "advanced"
+  // "intensive" | "elementary" | "middle" | "high" | "advanced"
   const [group, setGroup] = useState("intensive");
 
   // ✅ 모바일 감지
@@ -134,8 +134,7 @@ export default function EnrollPage() {
   const labelByGroup = {
     intensive: "집중학습반(26년1월)",
     elementary: "초등부(26년3월)",
-    middle: "중등부(26년3월)",
-    middleClinic: "중등부 클리닉(26년3월)",
+    middle: "중등부(26년3월)", // ✅ 중등부 안에 클리닉 포함(추가 제공)으로 처리
     high: "고등부(26년3월)",
     advanced: "심화경시반(26년3월)",
   };
@@ -483,7 +482,8 @@ export default function EnrollPage() {
     return count >= CLINIC_REGULAR_LIMIT;
   };
 
-  // ====== ✅ 집중연산반: 학생 저장값 구독 (operation_by_student/{studentId}) ======
+  // =========================
+  // ✅ 집중연산반: 학생 저장값 구독 (operation_by_student/{studentId}) ======
   useEffect(() => {
     if (!studentId) {
       setSavedOperation(null);
@@ -566,7 +566,6 @@ export default function EnrollPage() {
   }, []);
 
   const toggleIntensiveSlot = (day, time) => {
-    // 같은 요일 중복 선택 불가 → 해당 요일 이미 선택돼 있으면 "교체"
     const already = existsIn(intensiveSelected, day, time);
     if (already) {
       setIntensiveSelected(
@@ -597,13 +596,11 @@ export default function EnrollPage() {
       return;
     }
 
-    // ✅ 1개/2개/3개 모두 가능 (0개만 금지)
     if (intensiveSelected.length < 1 || intensiveSelected.length > 3) {
       alert("집중학습반은 1개 ~ 3개를 선택해 주세요.");
       return;
     }
 
-    // 정원 체크 (8명) - 화면 노출 X
     for (const { day, time } of intensiveSelected) {
       const k = keyOf(day, time);
       const current = intensiveCounts[k] || 0;
@@ -619,7 +616,6 @@ export default function EnrollPage() {
 
     const batch = writeBatch(db);
 
-    // 1) 학생별 저장
     const refByStudent = doc(db, "intensive_by_student", studentId);
     batch.set(
       refByStudent,
@@ -632,7 +628,6 @@ export default function EnrollPage() {
       { merge: true }
     );
 
-    // 2) 카운트용: 기존 내 기록 삭제 후 재기록
     const qMe = query(
       collection(db, "intensive_enrollments"),
       where("studentId", "==", studentId)
@@ -941,6 +936,16 @@ export default function EnrollPage() {
     alert("클리닉 신청이 저장되었습니다.");
   };
 
+  // ✅ 클리닉 저장 취소(삭제) 버튼용 (선택사항)
+  const clearClinic = async () => {
+    if (!studentId) return;
+    if (!confirm("저장된 클리닉을 삭제할까요?")) return;
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "middle_clinic_days", studentId));
+    await batch.commit();
+    alert("클리닉이 삭제되었습니다.");
+  };
+
   // ====== ✅ 집중연산반 저장 ======
   const saveOperation = async () => {
     if (!studentId || !studentName.trim()) {
@@ -1016,7 +1021,6 @@ export default function EnrollPage() {
       return;
     }
 
-    // ✅ 초등/중등: 1개 또는 2개 선택 가능
     if (selectedApplied.length > 2) {
       alert("한 번에 최대 2개까지만 선택할 수 있습니다.");
       return;
@@ -1145,7 +1149,8 @@ export default function EnrollPage() {
     return lines;
   })();
 
-  const tabs = ["intensive", "elementary", "middle", "middleClinic", "high", "advanced"];
+  // ✅ 탭: middleClinic 제거
+  const tabs = ["intensive", "elementary", "middle", "high", "advanced"];
 
   // =========================
   // ✅ 모바일용 렌더링 유틸
@@ -1256,11 +1261,7 @@ export default function EnrollPage() {
         {tabs.map((g) => {
           const active = group === g;
           return (
-            <button
-              key={g}
-              onClick={() => setGroup(g)}
-              style={tabBtn(active)}
-            >
+            <button key={g} onClick={() => setGroup(g)} style={tabBtn(active)}>
               {labelByGroup[g]}
             </button>
           );
@@ -1295,7 +1296,6 @@ export default function EnrollPage() {
             )}
           </div>
 
-          {/* ✅ 모바일: 요일별 카드 + 2열 그리드 */}
           {isMobile ? (
             <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
               {INT_DAYS.map((day) => (
@@ -1343,7 +1343,6 @@ export default function EnrollPage() {
               ))}
             </div>
           ) : (
-            // ✅ PC: 표
             <div style={{ marginTop: 14, overflowX: "auto" }}>
               <table
                 style={{
@@ -1581,140 +1580,6 @@ export default function EnrollPage() {
               <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900 }}>
                 업데이트: {highUpdatedAt.toLocaleString()}
               </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {/* =========================
-          ✅ 중등부 클리닉
-      ========================= */}
-      {group === "middleClinic" ? (
-        <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-            중등부 클리닉(정기) 신청
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-            요일 + A/B반 선택 후 저장
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
-              요일 선택
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-              {weekdays.map((day) => {
-                const active = clinicRegular?.day === day;
-                return (
-                  <button
-                    key={day}
-                    onClick={() => handleSelectRegularDay(day)}
-                    style={{
-                      padding: "10px 8px",
-                      borderRadius: 12,
-                      border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
-                      background: active ? "#eef5ff" : "#ffffff",
-                      cursor: "pointer",
-                      fontWeight: 900,
-                      fontSize: 13,
-                    }}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
-              반 선택
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                gap: 8,
-              }}
-            >
-              {CLINIC_BLOCKS.map((b) => {
-                const active = clinicRegular?.blockId === b.id;
-                const full = clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
-
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => handleSelectRegularBlock(b.id)}
-                    disabled={full}
-                    style={{
-                      padding: "12px 12px",
-                      borderRadius: 12,
-                      border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
-                      background: active ? "#eef5ff" : "#ffffff",
-                      cursor: full ? "not-allowed" : "pointer",
-                      opacity: full ? 0.6 : 1,
-                      fontWeight: 900,
-                      textAlign: "left",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
-                      <span>{b.label}</span>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 900,
-                          color: full ? "#ef4444" : "#6b7280",
-                        }}
-                      >
-                        {full ? "마감" : "선택"}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            onClick={saveRegularClinic}
-            style={{
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid #2563eb",
-              background: "#2563eb",
-              color: "white",
-              fontWeight: 900,
-              cursor: "pointer",
-              width: isMobile ? "100%" : "auto",
-            }}
-          >
-            클리닉 저장
-          </button>
-
-          <div
-            style={{
-              marginTop: 14,
-              padding: 12,
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              background: "#f9fafb",
-            }}
-          >
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>저장된 클리닉</div>
-            {savedClinic?.regular ? (
-              <div style={{ color: "#111827", fontWeight: 900 }}>
-                {savedClinic.regular.day}{" "}
-                {savedClinic.regular.blockId === "A" ? "A(5~7)" : "B(7~9)"}
-              </div>
-            ) : (
-              <div style={{ color: "#6b7280" }}>저장된 클리닉이 없습니다.</div>
             )}
           </div>
         </div>
@@ -2048,6 +1913,167 @@ export default function EnrollPage() {
               </div>
             )}
           </div>
+
+          {/* ✅✅ 중등부일 때만: "클리닉 추가(선택)" 섹션 */}
+          {group === "middle" ? (
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 14,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                }}
+              >
+                <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 6 }}>
+                  클리닉(추가 제공 · 선택)
+                </div>
+
+                {/* ✅ 짧고 배려처럼 */}
+                <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6, marginBottom: 12 }}>
+                  숙제/보완이 필요한 경우에만 제공되는 추가 관리 시간입니다. <b>시간 가능할 때만</b> 신청하시면 됩니다.
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+                    요일 선택
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
+                    {weekdays.map((day) => {
+                      const active = clinicRegular?.day === day;
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => handleSelectRegularDay(day)}
+                          style={{
+                            padding: "10px 8px",
+                            borderRadius: 12,
+                            border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
+                            background: active ? "#eef5ff" : "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 900,
+                            fontSize: 13,
+                          }}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+                    반 선택
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                      gap: 8,
+                    }}
+                  >
+                    {CLINIC_BLOCKS.map((b) => {
+                      const active = clinicRegular?.blockId === b.id;
+                      const full = clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
+
+                      return (
+                        <button
+                          key={b.id}
+                          onClick={() => handleSelectRegularBlock(b.id)}
+                          disabled={full}
+                          style={{
+                            padding: "12px 12px",
+                            borderRadius: 12,
+                            border: active ? "1px solid #2563eb" : "1px solid #e5e7eb",
+                            background: active ? "#eef5ff" : "#ffffff",
+                            cursor: full ? "not-allowed" : "pointer",
+                            opacity: full ? 0.6 : 1,
+                            fontWeight: 900,
+                            textAlign: "left",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 10,
+                              alignItems: "center",
+                            }}
+                          >
+                            <span>{b.label}</span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: full ? "#ef4444" : "#6b7280",
+                              }}
+                            >
+                              {full ? "마감" : "선택"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={saveRegularClinic}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: "1px solid #2563eb",
+                      background: "#2563eb",
+                      color: "white",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      width: isMobile ? "100%" : "auto",
+                    }}
+                  >
+                    클리닉 저장
+                  </button>
+
+                  <button
+                    onClick={clearClinic}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      border: "1px solid #e5e7eb",
+                      background: "#fff",
+                      color: "#111827",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      width: isMobile ? "100%" : "auto",
+                    }}
+                  >
+                    클리닉 삭제
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
+                  }}
+                >
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>저장된 클리닉</div>
+                  {savedClinic?.regular ? (
+                    <div style={{ color: "#111827", fontWeight: 900 }}>
+                      {savedClinic.regular.day}{" "}
+                      {savedClinic.regular.blockId === "A" ? "A(5~7)" : "B(7~9)"}
+                    </div>
+                  ) : (
+                    <div style={{ color: "#6b7280" }}>저장된 클리닉이 없습니다.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* 저장된 내용 */}
           <div

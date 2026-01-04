@@ -321,7 +321,6 @@ function AppContent() {
         <Route path="notices" element={guard(<NoticesPage />)} />
         <Route path="myclass" element={guard(<MyClassPage />)} />
         <Route path="enroll" element={guard(<EnrollPage />)} />
-        <Route path="/admin-attendance-book" element={<AdminAttendanceBookPage />} />
 
 
         {/* ✅✅ 핵심2) 어떤 주소로 와도 “해시 루트”로 보내기 */}
