@@ -29,6 +29,7 @@ import MonthlyPaymentPage from "./pages/MonthlyPaymentPage.jsx";
 // ✅ 새로 추가되는 페이지 2개
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
 import SelectChildPage from "./pages/SelectChildPage.jsx";
+import AdminAttendanceBookPage from "./pages/AdminAttendanceBookPage.jsx";
 
 import React from "react";
 import "./App.css";
@@ -321,6 +322,8 @@ function AppContent() {
         <Route path="notices" element={guard(<NoticesPage />)} />
         <Route path="myclass" element={guard(<MyClassPage />)} />
         <Route path="enroll" element={guard(<EnrollPage />)} />
+        <Route path="/admin-attendance-book" element={<AdminAttendanceBookPage />} />
+
 
         {/* ✅✅ 핵심2) 어떤 주소로 와도 “해시 루트”로 보내기 */}
         <Route path="*" element={<Navigate to="/" replace />} />
