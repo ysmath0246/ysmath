@@ -26,9 +26,8 @@ import EnrollPage from "./pages/EnrollPage.jsx";
 // ✅ 월제 결제 메인 페이지 (새로 추가)
 import MonthlyPaymentPage from "./pages/MonthlyPaymentPage.jsx";
 
-// ✅ 새로 추가되는 페이지 2개
+// ✅ 비밀번호 변경만 유지
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
-import SelectChildPage from "./pages/SelectChildPage.jsx";
 
 import React from "react";
 import "./App.css";
@@ -68,7 +67,6 @@ const toJSDate = (v) => {
 
 export default function App() {
   return (
-    // ✅ HashRouter는 basename 쓰면 충돌남 → 제거!
     <HashRouter>
       <ErrorBoundary>
         <AppContent />
@@ -80,15 +78,12 @@ export default function App() {
 function AppContent() {
   const location = useLocation();
 
-  // ✅ 새 로그인 상태 기준 (부모 계정 기준)
+  // ✅ 부모 로그인 상태 기준
   const [isParentLoggedIn, setIsParentLoggedIn] = useState(
     Boolean(localStorage.getItem("parentPhone"))
   );
   const [mustChangePw, setMustChangePw] = useState(
     localStorage.getItem("mustChangePassword") === "1"
-  );
-  const [hasStudentSelected, setHasStudentSelected] = useState(
-    Boolean(localStorage.getItem("studentId"))
   );
 
   const [hasNewCommentOrBook, setHasNewCommentOrBook] = useState(false);
@@ -98,7 +93,6 @@ function AppContent() {
     const checkLogin = () => {
       setIsParentLoggedIn(Boolean(localStorage.getItem("parentPhone")));
       setMustChangePw(localStorage.getItem("mustChangePassword") === "1");
-      setHasStudentSelected(Boolean(localStorage.getItem("studentId")));
     };
     window.addEventListener("storage", checkLogin);
     return () => window.removeEventListener("storage", checkLogin);
@@ -108,13 +102,15 @@ function AppContent() {
   useEffect(() => {
     setIsParentLoggedIn(Boolean(localStorage.getItem("parentPhone")));
     setMustChangePw(localStorage.getItem("mustChangePassword") === "1");
-    setHasStudentSelected(Boolean(localStorage.getItem("studentId")));
   }, [location]);
 
-  // 최근 3일 새 글/완북 체크 (학생 선택된 상태에서만)
+  // ✅ 최근 3일 새 글/완북 체크 (studentId가 있으면 체크, 없으면 표시 안함)
   useEffect(() => {
     const studentId = localStorage.getItem("studentId");
-    if (!studentId) return;
+    if (!studentId) {
+      setHasNewCommentOrBook(false);
+      return;
+    }
 
     const checkNewItems = async () => {
       const today = new Date();
@@ -128,8 +124,7 @@ function AppContent() {
         const data = doc.data();
         return (
           data.studentId === studentId &&
-          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >=
-            cutoff
+          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >= cutoff
         );
       });
 
@@ -137,8 +132,7 @@ function AppContent() {
         const data = doc.data();
         return (
           data.studentId === studentId &&
-          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >=
-            cutoff
+          (toJSDate(data.createdAt || data.completedDate) ?? new Date(0)) >= cutoff
         );
       });
 
@@ -146,21 +140,20 @@ function AppContent() {
     };
 
     checkNewItems();
-  }, [hasStudentSelected]);
+  }, [location]);
 
   const logout = () => {
     localStorage.clear();
     setIsParentLoggedIn(false);
     setMustChangePw(false);
-    setHasStudentSelected(false);
     window.location.hash = "#/login";
   };
 
   // ✅ 라우트 가드(공통)
+  // (SelectChildPage 없앴으니 student 선택 체크는 하지 않음)
   const guard = (element) => {
     if (!isParentLoggedIn) return <Navigate to="login" replace />;
     if (mustChangePw) return <Navigate to="change-password" replace />;
-    if (!hasStudentSelected) return <Navigate to="select-child" replace />;
     return element;
   };
 
@@ -172,7 +165,7 @@ function AppContent() {
           <div className="nav-links" style={{ justifyContent: "center" }}>
             {[
               "/attendance",
-              "/payment", // ✅ 월제 결제가 여기로
+              "/payment",
               "/notices",
               "/myclass",
               "/enroll",
@@ -197,7 +190,7 @@ function AppContent() {
                 {(() => {
                   const labelMap = {
                     "/attendance": "출석",
-                    "/payment": "결제", // ✅ 월제(메인)
+                    "/payment": "결제",
                     "/notices": "공지사항",
                     "/enroll": "수강신청",
                   };
@@ -276,15 +269,13 @@ function AppContent() {
               <Navigate to="login" replace />
             ) : mustChangePw ? (
               <Navigate to="change-password" replace />
-            ) : !hasStudentSelected ? (
-              <Navigate to="select-child" replace />
             ) : (
               <Navigate to="notices" replace />
             )
           }
         />
 
-        {/* ② 로그인/비번변경/자녀선택 */}
+        {/* ② 로그인/비번변경 */}
         <Route path="login" element={<LoginPage />} />
         <Route
           path="change-password"
@@ -296,34 +287,16 @@ function AppContent() {
             )
           }
         />
-        <Route
-          path="select-child"
-          element={
-            !isParentLoggedIn ? (
-              <Navigate to="login" replace />
-            ) : mustChangePw ? (
-              <Navigate to="change-password" replace />
-            ) : (
-              <SelectChildPage />
-            )
-          }
-        />
 
-        {/* ③ 주요 페이지 (학생 선택까지 끝난 상태에서만) */}
+        {/* ③ 주요 페이지 */}
         <Route path="attendance" element={guard(<AttendancePage />)} />
-
-        {/* ✅ 결제 메인 = 월제 페이지 */}
         <Route path="payment" element={guard(<MonthlyPaymentPage />)} />
-
-        {/* ✅ 지난 결제 내역(예전 횟수제) 페이지 */}
         <Route path="payment-history" element={guard(<PaymentPage />)} />
-
         <Route path="notices" element={guard(<NoticesPage />)} />
         <Route path="myclass" element={guard(<MyClassPage />)} />
         <Route path="enroll" element={guard(<EnrollPage />)} />
 
-
-        {/* ✅✅ 핵심2) 어떤 주소로 와도 “해시 루트”로 보내기 */}
+        {/* ✅ 어떤 주소로 와도 해시 루트로 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

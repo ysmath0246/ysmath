@@ -258,6 +258,23 @@ export default function EnrollPage() {
     transition: "transform 0.06s ease",
   });
 
+  // ✅ PC에서 요일별 시간칩: 한 줄 + 가로 스크롤 (초/중등/집중학습반 공통)
+  const pcRowStrip = {
+    display: "flex",
+    flexWrap: "nowrap", // ✅ 줄바꿈 금지
+    gap: 10,
+    overflowX: "auto", // ✅ 넘치면 가로 스크롤
+    paddingBottom: 6,
+    WebkitOverflowScrolling: "touch",
+  };
+
+  const pcChipStyle = (active, disabled = false) => ({
+    ...btnChip(active, disabled),
+    flex: "0 0 auto", // ✅ 버튼이 줄에서 고정폭(줄바꿈 방지)
+    minWidth: 160, // ✅ 너무 납작해지지 않게
+    width: "auto",
+  });
+
   // ✅ 상단 select
   const selectStyle = {
     padding: isMobile ? "12px 12px" : "10px 12px",
@@ -629,7 +646,9 @@ export default function EnrollPage() {
       const k = keyOf(day, time);
       const current = intensiveCounts[k] || 0;
 
-      const alreadyMine = savedIntensive.some((s) => s.day === day && s.time === time);
+      const alreadyMine = savedIntensive.some(
+        (s) => s.day === day && s.time === time
+      );
       const adjusted = alreadyMine ? current - 1 : current;
 
       if (adjusted >= INT_LIMIT) {
@@ -853,7 +872,11 @@ export default function EnrollPage() {
     }
 
     await batch.commit();
-    alert(nextApplied ? "심화경시반 신청이 저장되었습니다." : "심화경시반 신청이 취소되었습니다.");
+    alert(
+      nextApplied
+        ? "심화경시반 신청이 저장되었습니다."
+        : "심화경시반 신청이 취소되었습니다."
+    );
   };
 
   // ====== ✅ 초등부/중등부 선택 로직 ======
@@ -907,7 +930,9 @@ export default function EnrollPage() {
   };
 
   const removeApplied = (day, time) =>
-    setSelectedApplied(selectedApplied.filter((s) => !(s.day === day && s.time === time)));
+    setSelectedApplied(
+      selectedApplied.filter((s) => !(s.day === day && s.time === time))
+    );
 
   // ====== 중등부 클리닉 선택/저장 ======
   const handleSelectRegularDay = (day) => {
@@ -1149,7 +1174,8 @@ export default function EnrollPage() {
     if (elem.length) {
       const txt = elem
         .map(
-          (s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
+          (s) =>
+            `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
         )
         .join(", ");
       lines.push(`🟩 초등부: ${txt}`);
@@ -1158,7 +1184,8 @@ export default function EnrollPage() {
     if (mid.length) {
       const txt = mid
         .map(
-          (s) => `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
+          (s) =>
+            `${s.day} ${s.time}${s.status === "reserve" ? " (예비)" : " (신청)"}`
         )
         .join(", ");
       lines.push(`🟨 중등부: ${txt}`);
@@ -1185,14 +1212,14 @@ export default function EnrollPage() {
   const tabs = ["intensive", "elementary", "middle", "high", "advanced"];
 
   // =========================
-  // ✅ 모바일용 렌더링 유틸 (여기 핵심 변경!)
+  // ✅ 모바일용 렌더링 유틸
   // =========================
   const MobileDayCard = ({ day, children }) => (
     <div
       style={{
         border: "1px solid #e5e7eb",
         borderRadius: 14,
-        padding: 10, // ✅ 더 촘촘
+        padding: 10,
         background: "#fff",
       }}
     >
@@ -1200,7 +1227,7 @@ export default function EnrollPage() {
         style={{
           fontWeight: 900,
           marginBottom: 8,
-          fontSize: 13, // ✅ 조금 작게
+          fontSize: 13,
         }}
       >
         {day}
@@ -1214,8 +1241,8 @@ export default function EnrollPage() {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)", // ✅ 2 -> 3
-        gap: 8, // ✅ 10 -> 8
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 8,
       }}
     >
       {children}
@@ -1242,7 +1269,7 @@ export default function EnrollPage() {
       <div
         style={{
           fontWeight: 900,
-          fontSize: 15, // ✅ 18 -> 15
+          fontSize: 15,
           lineHeight: 1,
           whiteSpace: "nowrap",
           letterSpacing: -0.2,
@@ -1269,7 +1296,9 @@ export default function EnrollPage() {
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 900 }}>수강신청</div>
+            <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 900 }}>
+              수강신청
+            </div>
             <div
               style={{
                 marginTop: 6,
@@ -1288,7 +1317,14 @@ export default function EnrollPage() {
 
           {childList.length > 0 && (
             <div style={{ width: isMobile ? "100%" : "auto" }}>
-              <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 900, marginBottom: 6 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#6b7280",
+                  fontWeight: 900,
+                  marginBottom: 6,
+                }}
+              >
                 아이 선택
               </div>
               <select
@@ -1306,7 +1342,7 @@ export default function EnrollPage() {
           )}
         </div>
 
-        {/* ✅ 초/중등 상태 + 범례(모바일 가독성↑ / 카드 안 글씨↓) */}
+        {/* ✅ 초/중등 상태 + 범례 */}
         <div
           style={{
             marginTop: 10,
@@ -1469,7 +1505,8 @@ export default function EnrollPage() {
                         {day}
                       </td>
                       <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        {/* ✅ PC: 한 줄 고정 + 가로 스크롤 */}
+                        <div style={pcRowStrip}>
                           {INT_TIMES.map((t) => {
                             const k = keyOf(day, t);
                             const cnt = intensiveCounts[k] || 0;
@@ -1488,7 +1525,7 @@ export default function EnrollPage() {
                                   toggleIntensiveSlot(day, t);
                                 }}
                                 disabled={full}
-                                style={{ ...btnChip(isSel, full), minWidth: 190 }}
+                                style={pcChipStyle(isSel, full)}
                               >
                                 <div
                                   style={{
@@ -1498,7 +1535,9 @@ export default function EnrollPage() {
                                     alignItems: "center",
                                   }}
                                 >
-                                  <div style={{ fontWeight: 900, fontSize: 16 }}>{t}</div>
+                                  <div style={{ fontWeight: 900, fontSize: 16, whiteSpace: "nowrap" }}>
+                                    {t}
+                                  </div>
                                   <StatusLegend text={label.text} tone={label.tone} />
                                 </div>
                               </button>
@@ -1567,7 +1606,9 @@ export default function EnrollPage() {
       ========================= */}
       {group === "high" ? (
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>고등부(26년3월)</div>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
+            고등부(26년3월)
+          </div>
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
             월/화/목/금 중 선택 (최대 4개)
           </div>
@@ -1597,12 +1638,27 @@ export default function EnrollPage() {
                   style={btnChip(active, full)}
                 >
                   {isMobile ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ fontWeight: 900, fontSize: 15, whiteSpace: "nowrap" }}>{day}요일</div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900, fontSize: 15, whiteSpace: "nowrap" }}>
+                        {day}요일
+                      </div>
                       <StatusDotMini tone={label.tone} />
                     </div>
                   ) : (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
                       <div style={{ fontWeight: 900, fontSize: 18 }}>{day}요일</div>
                       <StatusLegend text={label.text} tone={label.tone} />
                     </div>
@@ -1667,6 +1723,15 @@ export default function EnrollPage() {
           <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 6 }}>
             심화경시반(26년3월)
           </div>
+        <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.6, marginBottom: 12 }}>
+  • 초등부: 홀수차(1·3주차) 수업 진행<br />
+  • 중등부: 짝수차(2·4주차) 수업 진행<br />
+  • 시험기간에도 요일·시간은 유지되며, 수업 방향만 조정됩니다.<br />
+  • 개인 결석에 대한 보강은 제공되지 않습니다.<br />
+  • 5주차는 공휴일 등으로 수업이 빠졌을 경우를 대비한 예비 수업 주차입니다.
+</div>
+
+
           <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
             신청 / 신청취소 버튼만 저장됩니다.
           </div>
@@ -1739,7 +1804,7 @@ export default function EnrollPage() {
       ) : null}
 
       {/* =========================
-          ✅ 초등/중등 (모바일: 카드+그리드 3열 + 카드 안 글씨 최소화)
+          ✅ 초등/중등
       ========================= */}
       {group === "elementary" || group === "middle" ? (
         <div style={{ ...card, padding: isMobile ? 12 : 14 }}>
@@ -1770,7 +1835,8 @@ export default function EnrollPage() {
                           <button
                             key={`${day}-${t}`}
                             onClick={() => {
-                              if (!enrollConfig.isOpen) return alert("현재 수강신청이 마감되었습니다.");
+                              if (!enrollConfig.isOpen)
+                                return alert("현재 수강신청이 마감되었습니다.");
                               if (group === "elementary") toggleElementarySlot(day, t);
                               else toggleMiddleSlot(day, t);
                             }}
@@ -1838,7 +1904,8 @@ export default function EnrollPage() {
                           {day}
                         </td>
                         <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                          {/* ✅ PC: 한 줄 고정 + 가로 스크롤 */}
+                          <div style={pcRowStrip}>
                             {times.map((t) => {
                               const k = keyOf(day, t);
                               const appliedCnt = countsApplied[k] || 0;
@@ -1865,7 +1932,7 @@ export default function EnrollPage() {
                                     else toggleMiddleSlot(day, t);
                                   }}
                                   disabled={disabledCompletely}
-                                  style={{ ...btnChip(isSelected, disabledCompletely), minWidth: 180 }}
+                                  style={pcChipStyle(isSelected, disabledCompletely)}
                                 >
                                   <div
                                     style={{
@@ -1875,7 +1942,9 @@ export default function EnrollPage() {
                                       alignItems: "center",
                                     }}
                                   >
-                                    <div style={{ fontSize: 16, fontWeight: 900 }}>{t}</div>
+                                    <div style={{ fontSize: 16, fontWeight: 900, whiteSpace: "nowrap" }}>
+                                      {t}
+                                    </div>
                                     <StatusLegend text={label.text} tone={label.tone} />
                                   </div>
                                 </button>
@@ -1984,40 +2053,40 @@ export default function EnrollPage() {
                 }}
               >
                 <div style={{ fontWeight: 900, fontSize: 14, marginBottom: 6 }}>
-  클리닉(추가/선택형) 💰 추가금 없음
-</div>
+                  클리닉(추가/선택형) 💰 추가금 없음
+                </div>
 
-<div
-  style={{
-    fontSize: 12,
-    color: "#6b7280",
-    lineHeight: 1.6,
-    marginBottom: 12,
-  }}
->
-  <span style={{ color: "#16a34a", fontWeight: 600 }}>
-    ✔ 숙제 완벽 → 집에서 숙제 대체 가능
-  </span>
-
-  <br />
-
-  <span style={{ color: "#e11d48", fontWeight: 700 }}>
-    ❗ 숙제 미흡 / 이해 부족 → 클리닉 등원 권장
-  </span>
-
-  <br />
-
-  <span style={{ color: "#2563eb", fontWeight: 600 }}>
-    목적 :
-  </span>{" "}
-  <b style={{ color: "#1f2937" }}>
-    미완성 숙제 정리 / 개념 누락 보완 / 시험 대비 안정화
-  </b>
-</div>
-
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#6b7280",
+                    lineHeight: 1.6,
+                    marginBottom: 12,
+                  }}
+                >
+                  <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                    ✔ 숙제 완벽 → 집에서 숙제 대체 가능
+                  </span>
+                  <br />
+                  <span style={{ color: "#e11d48", fontWeight: 700 }}>
+                    ❗ 숙제 미흡 / 이해 부족 → 클리닉 등원 권장
+                  </span>
+                  <br />
+                  <span style={{ color: "#2563eb", fontWeight: 600 }}>목적 :</span>{" "}
+                  <b style={{ color: "#1f2937" }}>
+                    미완성 숙제 정리 / 개념 누락 보완 / 시험 대비 안정화
+                  </b>
+                </div>
 
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#4b5563",
+                      marginBottom: 6,
+                      fontWeight: 900,
+                    }}
+                  >
                     요일 선택
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
@@ -2045,7 +2114,14 @@ export default function EnrollPage() {
                 </div>
 
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6, fontWeight: 900 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#4b5563",
+                      marginBottom: 6,
+                      fontWeight: 900,
+                    }}
+                  >
                     반 선택
                   </div>
                   <div
@@ -2057,7 +2133,8 @@ export default function EnrollPage() {
                   >
                     {CLINIC_BLOCKS.map((b) => {
                       const active = clinicRegular?.blockId === b.id;
-                      const full = clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
+                      const full =
+                        clinicRegular?.day && isRegularFull(clinicRegular.day, b.id, true);
 
                       return (
                         <button
@@ -2084,7 +2161,13 @@ export default function EnrollPage() {
                             }}
                           >
                             <span>{b.label}</span>
-                            <span style={{ fontSize: 12, fontWeight: 900, color: full ? "#ef4444" : "#6b7280" }}>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: full ? "#ef4444" : "#6b7280",
+                              }}
+                            >
                               {full ? "마감" : "선택"}
                             </span>
                           </div>

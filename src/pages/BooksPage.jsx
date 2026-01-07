@@ -1,43 +1,77 @@
-import { useState, useEffect, useMemo } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import React, { useEffect, useMemo, useState } from "react";
 import { db } from "../firebase";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 export default function BooksPage() {
-  console.log("📚 바뀜 감지!")
   const [books, setBooks] = useState([]);
-  const [sortKey, setSortKey] = useState("");
+  const [sortKey, setSortKey] = useState(""); // grade | title | completedDate
   const studentId = localStorage.getItem("studentId");
 
+  // ✅ 모바일 감지
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 640px)").matches;
+  });
+
   useEffect(() => {
-    const ref = collection(db, "books");
+    const mq = window.matchMedia("(max-width: 640px)");
+    const onChange = (e) => setIsMobile(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    setIsMobile(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+
+  // ✅ books 불러오기: where(studentId==...)
+  useEffect(() => {
+    if (!studentId) return;
+    const ref = query(collection(db, "books"), where("studentId", "==", studentId));
     return onSnapshot(ref, (qs) => {
-     const allBooks = qs.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      const myBooks = allBooks.filter((b) => b.studentId === studentId);
+      const myBooks = qs.docs.map((d) => ({ id: d.id, ...d.data() }));
       setBooks(myBooks);
     });
   }, [studentId]);
 
-  // 정렬된 책 목록
-  
+  // ✅ 정렬
   const sortedBooks = useMemo(() => {
     if (!sortKey) return books;
-     const arr = [...books];
- return arr.sort((a, b) => {
-   // sortKey에 따라 비교 로직…
-   if (sortKey === "grade")        return a.grade - b.grade;
-   else if (sortKey === "title")   return a.title.localeCompare(b.title);
-   else if (sortKey === "completedDate") return a.completedDate.localeCompare(b.completedDate);
-   return 0;
- });
 
+    const arr = [...books];
+    return arr.sort((a, b) => {
+      if (sortKey === "grade") {
+        const ag = Number(a.grade || 0);
+        const bg = Number(b.grade || 0);
+        return ag - bg;
+      }
+      if (sortKey === "title") {
+        return String(a.title || "").localeCompare(String(b.title || ""));
+      }
+      if (sortKey === "completedDate") {
+        // YYYY-MM-DD 문자열 기준 정렬 (없으면 뒤로)
+        const ad = String(a.completedDate || "9999-99-99");
+        const bd = String(b.completedDate || "9999-99-99");
+        return ad.localeCompare(bd);
+      }
+      return 0;
+    });
   }, [books, sortKey]);
 
+  // ✅ CSV 다운로드 (이름 제외)
   const handleDownload = () => {
-    const headers = ["번호", "이름", "학년", "책 제목", "완료일"];
-    const rows = sortedBooks.map((b, idx) => [idx + 1, b.name, b.grade, b.title, b.completedDate]);
+    const headers = ["번호", "학년", "책 제목", "완료일"];
+    const rows = sortedBooks.map((b, idx) => [
+      idx + 1,
+      b.grade ?? "",
+      (b.title || "").replaceAll("\n", " "),
+      b.completedDate ?? "",
+    ]);
+
     let csv = headers.join(",") + "\n";
     rows.forEach((r) => {
-      csv += r.join(",") + "\n";
+      csv += r.map((x) => `"${String(x).replaceAll('"', '""')}"`).join(",") + "\n";
     });
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -49,98 +83,161 @@ export default function BooksPage() {
     URL.revokeObjectURL(url);
   };
 
-  return (
- <div className="container">
-      <h1 style={{ fontSize: "24px", marginBottom: "20px" }}>
-        📚 문제집 관리 (총 갯수: {books.length})
-      </h1>
+  const styles = {
+    page: {
+      maxWidth: 980,
+      margin: "0 auto",
+      padding: isMobile ? "16px 12px 60px" : "28px 14px 60px",
+    },
+    title: { fontSize: isMobile ? 18 : 22, fontWeight: 900, marginBottom: 12 },
+    toolbar: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      alignItems: "center",
+      marginBottom: 14,
+    },
+    btn: {
+      padding: isMobile ? "10px 12px" : "8px 12px",
+      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      background: "#fff",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700,
+    },
+    btnPrimary: {
+      padding: isMobile ? "10px 12px" : "8px 12px",
+      borderRadius: 12,
+      border: "1px solid #2563eb",
+      background: "#2563eb",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 800,
+    },
+    pill: {
+      fontSize: 12,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#f3f4f6",
+      color: "#374151",
+    },
 
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-        <button
-          onClick={handleDownload}
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#007bff",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          엑셀 다운로드
+    // ✅ 모바일 카드
+    list: { display: "grid", gap: 10, marginTop: 10 },
+    card: {
+      background: "#fff",
+      border: "1px solid #eef2f7",
+      borderRadius: 16,
+      padding: 12,
+      boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
+    },
+    bookTitle: { fontSize: 15, fontWeight: 900, color: "#0f172a" },
+    metaRow: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" },
+    meta: {
+      fontSize: 12,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#eff6ff",
+      border: "1px solid #dbeafe",
+      color: "#1d4ed8",
+    },
+    metaGray: {
+      fontSize: 12,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "#f3f4f6",
+      color: "#374151",
+    },
+
+    // ✅ PC 테이블
+    tableWrap: {
+      overflowX: "auto",
+      borderRadius: 14,
+      border: "1px solid #eef2f7",
+      marginTop: 14,
+      background: "#fff",
+    },
+    table: { width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 640 },
+    th: {
+      textAlign: "left",
+      fontSize: 12,
+      color: "#6b7280",
+      padding: "12px 12px",
+      borderBottom: "1px solid #eef2f7",
+      background: "#f8fafc",
+    },
+    td: { fontSize: 13, padding: "12px 12px", borderBottom: "1px solid #f1f5f9" },
+
+    empty: { padding: 16, textAlign: "center", color: "#6b7280", fontSize: 14 },
+  };
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.title}>📚 문제집 관리 <span style={styles.pill}>총 {books.length}개</span></div>
+
+      <div style={styles.toolbar}>
+        <button style={styles.btnPrimary} onClick={handleDownload}>
+          엑셀(CSV) 다운로드
         </button>
-        <button
-          onClick={() => setSortKey("grade")}
-          style={{
-            padding: "8px 12px",
-            marginLeft: "4px",
-            backgroundColor: "#28a745",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+        <button style={styles.btn} onClick={() => setSortKey("grade")}>
           학년 정렬
         </button>
-        <button
-          onClick={() => setSortKey("title")}
-          style={{
-            padding: "8px 12px",
-            backgroundColor: "#17a2b8",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
+        <button style={styles.btn} onClick={() => setSortKey("title")}>
           문제집 정렬
         </button>
-        <button
-          onClick={() => setSortKey("completedDate")}
-          style={{
-            padding: "8px 12px",
-            backgroundColor: "#ffc107",
-            color: "#000",
-            border: "none",
-           borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-         완료일 정렬
+        <button style={styles.btn} onClick={() => setSortKey("completedDate")}>
+          완료일 정렬
+        </button>
+        <button style={styles.btn} onClick={() => setSortKey("")}>
+          정렬 해제
         </button>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "20px" }}>
-        <thead>
-          <tr>
-            <th style={{ border: "1px solid #ccc", padding: "8px" }}>번호</th>
-            <th style={{ border: "1px solid #ccc", padding: "8px" }}>이름</th>
-            <th style={{ border: "1px solid #ccc", padding: "8px" }}>학년</th>
-            <th style={{ border: "1px solid #ccc", padding: "8px" }}>책 제목</th>
-            <th style={{ border: "1px solid #ccc", padding: "8px" }}>완료일</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedBooks.length > 0 ? (
-            sortedBooks.map((b, idx) => (
-              <tr key={b.id}>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>{idx + 1}</td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>{b.name}</td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>{b.grade}</td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>{b.title}</td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>{b.completedDate}</td>
+      {sortedBooks.length === 0 ? (
+        <div style={styles.empty}>등록된 데이터가 없습니다.</div>
+      ) : isMobile ? (
+        // ✅ 모바일: 카드형 (이름 컬럼 없음)
+        <div style={styles.list}>
+          {sortedBooks.map((b, idx) => (
+            <div key={b.id} style={styles.card}>
+              <div style={styles.bookTitle}>
+                {idx + 1}. {b.title || "-"}
+              </div>
+
+              <div style={styles.metaRow}>
+                <span style={styles.meta}>학년: {b.grade ?? "-"}</span>
+                <span style={styles.metaGray}>완료일: {b.completedDate || "-"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // ✅ PC: 표 (이름 컬럼 제거)
+        <div style={styles.tableWrap}>
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>번호</th>
+                <th style={styles.th}>학년</th>
+                <th style={styles.th}>책 제목</th>
+                <th style={styles.th}>완료일</th>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="5" style={{ border: "1px solid #ccc", padding: "8px", textAlign: "center" }}>
-                등록된 데이터가 없습니다.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {sortedBooks.map((b, idx) => (
+                <tr key={b.id}>
+                  <td style={styles.td}>{idx + 1}</td>
+                  <td style={styles.td}>{b.grade ?? ""}</td>
+                  <td style={styles.td}>{b.title}</td>
+                  <td style={styles.td}>{b.completedDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
