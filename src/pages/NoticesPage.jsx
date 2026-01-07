@@ -468,7 +468,87 @@ export default function NoticesPage() {
   }, [expandedId, topIdSet, topNotices]);
 
   return (
+
+    
     <div style={wrap}>
+
+      {/* ✅ 카카오채널 바로가기 */}
+<div
+  style={{
+    ...compactCard,
+    border: "1px solid #fde68a",
+    background: "linear-gradient(135deg, #fffbeb, #fff)",
+    padding: isMobile ? "12px 12px" : "14px 16px",
+    marginBottom: 12,
+  }}
+  onClick={() => window.open("http://pf.kakao.com/_Kkxjsn", "_blank")}
+>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{ fontSize: 18 }}>💬</span>
+      <div>
+        <div style={{ fontWeight: 900, fontSize: 15, lineHeight: 1.2 }}>
+          카카오채널 바로가기
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
+          결석 연락 · 일정 변경 · 증빙 제출은 카카오채널로만 접수합니다.
+        </div>
+      </div>
+    </div>
+
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 900 }}>열기</span>
+      <span style={{ fontSize: 14, color: "#111827", fontWeight: 900 }}>›</span>
+    </div>
+  </div>
+
+  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <button
+      type="button"
+      style={{
+        border: "1px solid #111827",
+        background: "#111827",
+        color: "white",
+        borderRadius: 12,
+        padding: "10px 12px",
+        fontWeight: 900,
+        fontSize: 13,
+        cursor: "pointer",
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open("http://pf.kakao.com/_Kkxjsn", "_blank");
+      }}
+    >
+      카카오채널 열기
+    </button>
+
+    <button
+      type="button"
+      style={{
+        border: "1px solid #e5e7eb",
+        background: "white",
+        color: "#111827",
+        borderRadius: 12,
+        padding: "10px 12px",
+        fontWeight: 900,
+        fontSize: 13,
+        cursor: "pointer",
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // ✅ 앱/브라우저에서 복사 쉽게
+        navigator.clipboard?.writeText("http://pf.kakao.com/_Kkxjsn");
+        alert("카카오채널 링크를 복사했어요!");
+      }}
+    >
+      링크 복사
+    </button>
+  </div>
+</div>
+
       {/* 휴일(이번달만 요약) */}
       <div style={{
         ...compactCard,
